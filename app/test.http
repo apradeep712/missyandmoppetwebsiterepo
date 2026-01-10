@@ -1,0 +1,24 @@
+
+POST https://organic-robot-wg7jrvr9vqg2gjpq-3000.app.github.dev//api/checkout/create-order
+Content-Type: application/json
+
+{
+  "customer": {
+    "name": "Test User",
+    "email": "test@example.com",
+    "phone": "9999999999"
+  },
+  "shipping_address": {
+    "line1": "123 Test Street",
+    "city": "Mumbai",
+    "state": "Maharashtra",
+    "pincode": "400001"
+  },
+  "items": [
+    {
+      "product_id": "b86c3327-4a21-4742-9a4a-f50394641f1f",
+      "qty": 1,
+      "selected_age_months": 12
+    }
+  ]
+}

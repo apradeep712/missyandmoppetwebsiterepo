@@ -2,7 +2,14 @@
   
 import Link from 'next/link';  
 import HomeHeader from '@/app/components/HomeHeader';  
-import { useCartStore } from '@/app/store/cartStore';
+import { useCartStore } from '@/app/store/cartStore';  
+import { formatAgeFromMonths } from '@/lib/ageSizing';
+  
+function formatMoney(price_cents: number, currency: string) {  
+  const amount = price_cents / 100;  
+  if (currency === 'INR') return `₹${amount.toFixed(2)}`;  
+  return `${amount.toFixed(2)} ${currency}`;  
+}
   
 export default function CartPage() {  
   const items = useCartStore((s) => s.items);  
@@ -10,28 +17,24 @@ export default function CartPage() {
   const setQuantity = useCartStore((s) => s.setQuantity);  
   const clear = useCartStore((s) => s.clear);
   
-  const totalCents = items.reduce(  
-    (sum, item) => sum + item.price_cents * item.quantity,  
-    0  
-  );
+  // If you ever allow mixed currencies, you should compute totals per currency.  
+  // For now, we assume all items share the same currency (typical for a single-store checkout).  
+  const currency = items[0]?.currency ?? 'INR';
+  
+  const totalCents = items.reduce((sum, item) => sum + item.price_cents * item.quantity, 0);
   
   return (  
     <main className="min-h-screen bg-[#fdf7f2] text-[#4b3b33]">  
       <HomeHeader />
   
       <div className="mx-auto max-w-4xl px-4 py-8">  
-        <h1 className="mb-4 text-2xl font-semibold text-[#4b3b33]">  
-          Your cart  
-        </h1>
+        <h1 className="mb-4 text-2xl font-semibold text-[#4b3b33]">Your cart</h1>
   
         {items.length === 0 ? (  
           <div className="rounded-2xl border border-[#ead8cd] bg-white/90 p-6 text-sm text-[#7c675b]">  
             Your cart is empty.  
             <div className="mt-2">  
-              <Link  
-                href="/shop"  
-                className="text-[#4b3b33] underline underline-offset-4"  
-              >  
+              <Link href="/shop" className="text-[#4b3b33] underline underline-offset-4">  
                 Browse products  
               </Link>  
             </div>  
@@ -41,7 +44,7 @@ export default function CartPage() {
             <section className="space-y-3 rounded-2xl border border-[#ead8cd] bg-white/90 p-4">  
               {items.map((item) => (  
                 <div  
-                  key={item.id}  
+                  key={item.line_id}  
                   className="flex items-center justify-between gap-3 rounded-xl border border-[#ead8cd] bg-[#fdf7f2] p-3 text-xs sm:text-sm"  
                 >  
                   <div className="flex items-center gap-3">  
@@ -58,18 +61,22 @@ export default function CartPage() {
                           No image  
                         </div>  
                       )}  
-                    </div>  
+                    </div>
+  
                     <div>  
-                      <div className="font-medium text-[#4b3b33]">  
-                        {item.name}  
-                      </div>  
+                      <div className="font-medium text-[#4b3b33]">{item.name}</div>
+  
+                      {/* Price */}  
                       <div className="text-[11px] text-[#7c675b]">  
-                        {item.currency === 'INR'  
-                          ? `₹${(item.price_cents / 100).toFixed(2)}`  
-                          : `${(item.price_cents / 100).toFixed(2)} ${  
-                              item.currency  
-                            }`}  
-                      </div>  
+                        {formatMoney(item.price_cents, item.currency)}  
+                      </div>
+  
+                      {/* Size (age) */}  
+                      {item.selected_age_months !== null && (  
+                        <div className="mt-0.5 text-[11px] text-[#7c675b]">  
+                          Size: {formatAgeFromMonths(item.selected_age_months)}  
+                        </div>  
+                      )}  
                     </div>  
                   </div>
   
@@ -78,17 +85,15 @@ export default function CartPage() {
                     <div className="flex items-center gap-1">  
                       <button  
                         type="button"  
-                        onClick={() => setQuantity(item.id, item.quantity - 1)}  
+                        onClick={() => setQuantity(item.line_id, item.quantity - 1)}  
                         className="h-6 w-6 rounded-full border border-[#ead8cd] text-[12px] text-[#4b3b33]"  
                       >  
                         -  
                       </button>  
-                      <span className="w-6 text-center text-[12px]">  
-                        {item.quantity}  
-                      </span>  
+                      <span className="w-6 text-center text-[12px]">{item.quantity}</span>  
                       <button  
                         type="button"  
-                        onClick={() => setQuantity(item.id, item.quantity + 1)}  
+                        onClick={() => setQuantity(item.line_id, item.quantity + 1)}  
                         className="h-6 w-6 rounded-full border border-[#ead8cd] text-[12px] text-[#4b3b33]"  
                       >  
                         +  
@@ -97,7 +102,7 @@ export default function CartPage() {
   
                     <button  
                       type="button"  
-                      onClick={() => removeItem(item.id)}  
+                      onClick={() => removeItem(item.line_id)}  
                       className="rounded-full border border-[#f5c2c2] bg-[#fee2e2] px-3 py-1 text-[11px] text-[#a85454] hover:bg-[#fecaca]"  
                     >  
                       Remove  
@@ -111,9 +116,10 @@ export default function CartPage() {
               <div className="flex items-center justify-between">  
                 <span className="font-medium text-[#4b3b33]">Subtotal</span>  
                 <span className="font-semibold text-[#4b3b33]">  
-                  ₹{(totalCents / 100).toFixed(2)}  
+                  {formatMoney(totalCents, currency)}  
                 </span>  
-              </div>  
+              </div>
+  
               <p className="mt-2 text-[11px] text-[#7c675b]">  
                 Taxes and shipping will be calculated at checkout.  
               </p>
@@ -124,7 +130,8 @@ export default function CartPage() {
                   className="rounded-full bg-[#4b3b33] px-5 py-2 text-sm font-medium text-[#fdf7f2] hover:bg-[#3a2e29]"  
                 >  
                   Proceed to checkout  
-                </button>  
+                </button>
+  
                 <button  
                   type="button"  
                   onClick={clear}  

@@ -208,12 +208,7 @@ export default function CustomizePage() {
             >  
               Browse shop  
             </Link>  
-            <Link  
-              href="/try-at-home"  
-              className="rounded-full border border-[#ead8cd] bg-white/70 px-4 py-2 text-[12px] font-medium text-[#7c675b] transition-colors hover:bg-white hover:text-[#4b3b33]"  
-            >  
-              Try at home  
-            </Link>  
+           
           </div>  
         </div>
   
@@ -460,7 +455,7 @@ export default function CustomizePage() {
                 <div>  
                   <FieldLabel  
                     title="Describe your idea"  
-                    hint="Occasion, references, measurements, anything that helps. (Min 10 chars)"  
+                    hint="Occasion, references, measurements or the link to that Pintrest post you saw ! (Min 10 chars)"  
                   />  
                   <textarea  
                     value={idea}  

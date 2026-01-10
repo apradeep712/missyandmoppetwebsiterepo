@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';  
 import { useSupabaseBrowserClient } from '@/app/providers';  
 import HomeHeader from '@/app/components/HomeHeader';  
+
 import { useTryAtHomeStore } from '@/app/store/tryAtHomeStore';
+import type React from 'react';  
   
 type TryAtHomeFormState = {  
   name: string;  

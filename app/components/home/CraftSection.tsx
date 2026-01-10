@@ -7,40 +7,40 @@ const craftCards = [
   {  
     key: 'fabric',  
     label: 'Fabric',  
-    step: 'Step 1',  
+    step: '1',  
     title: 'Cloud-soft on tiny skin.',  
     body:  
       'We start with light, breathable cotton blends in calm pastels—chosen to feel gentle on newborn skin and sturdy enough for everyday tumbles.',  
     badge: 'Baby‑safe, premium weaves',  
     footerRight: 'FABRIC',  
-    image: '/hero/hero-4.jpg',  
+    image: '/try/trial2.png',  
   },  
   {  
     key: 'clean',  
     label: 'Clean & ready',  
-    step: 'Step 2',  
+    step: '2',  
     title: 'Fresh from first cuddle.',  
     body:  
       'Every piece is pre‑washed and checked so it arrives soft, clean and ready for that first wear—no stiffness, no scratchy seams.',  
     badge: 'Pre‑washed & skin‑kind',  
     footerRight: 'CLEAN',  
-    image: '/hero/hero-2.jpg',  
+    image: '/sub/subsa.png',  
   },  
   {  
     key: 'fit',  
     label: 'Comfort fit',  
-    step: 'Step 3',  
+    step: '3',  
     title: 'Made for wriggles and naps.',  
     body:  
       'Flat seams, comfy waistbands and easy necklines mean less fidgeting and more free movement—from crib naps to playground adventures.',  
     badge: 'Comfort‑first design',  
     footerRight: 'FIT',  
-    image: '/hero/hero-3.jpg',  
+    image: '/insta/bear.jpg',  
   },  
   {  
     key: 'sustain',  
     label: 'Thoughtful impact',  
-    step: 'Step 4',  
+    step: '4',  
     title: 'Kind to planet and hand‑me‑downs.',  
     body:  
       'We lean on durable stitching, versatile fits and considered quantities, so each piece can be washed, loved and passed along again.',  

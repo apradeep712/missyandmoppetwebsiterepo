@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
   
 export type CartItem = {  
+  line_id: string;  
   id: string;  
   name: string;  
   slug: string;  
@@ -11,15 +12,20 @@ export type CartItem = {
   price_cents: number;  
   currency: string;  
   quantity: number;  
+  selected_age_months: number | null;  
 };
   
 type CartState = {  
   items: CartItem[];  
-  addItem: (item: Omit<CartItem, 'quantity'>) => { ok: boolean; reason?: string };  
-  removeItem: (id: string) => void;  
+  addItem: (item: Omit<CartItem, 'quantity' | 'line_id'>) => { ok: boolean; reason?: string };  
+  removeItem: (line_id: string) => void;  
   clear: () => void;  
-  setQuantity: (id: string, quantity: number) => void;  
+  setQuantity: (line_id: string, quantity: number) => void;  
 };
+  
+function makeLineId(productId: string, selectedAgeMonths: number | null) {  
+  return `${productId}:${selectedAgeMonths ?? 'na'}`;  
+}
   
 export const useCartStore = create<CartState>()(  
   persist(  
@@ -27,20 +33,19 @@ export const useCartStore = create<CartState>()(
       items: [],
   
       addItem: (item) => {  
-        const current = get().items;
+        const current = get().items;  
+        const line_id = makeLineId(item.id, item.selected_age_months);
   
-        // If item already in cart, just bump quantity (without exceeding 5 total distinct items)  
-        const existing = current.find((i) => i.id === item.id);  
+        const existing = current.find((i) => i.line_id === line_id);  
         if (existing) {  
           set({  
             items: current.map((i) =>  
-              i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i  
+              i.line_id === line_id ? { ...i, quantity: i.quantity + 1 } : i  
             ),  
           });  
           return { ok: true };  
         }
   
-        // Max 5 distinct products  
         if (current.length >= 5) {  
           return {  
             ok: false,  
@@ -49,40 +54,26 @@ export const useCartStore = create<CartState>()(
           };  
         }
   
-        set({  
-          items: [  
-            ...current,  
-            {  
-              ...item,  
-              quantity: 1,  
-            },  
-          ],  
-        });  
+        set({ items: [...current, { ...item, line_id, quantity: 1 }] });  
         return { ok: true };  
       },
   
-      removeItem: (id) => {  
-        set({ items: get().items.filter((i) => i.id !== id) });  
-      },
+      removeItem: (line_id) => set({ items: get().items.filter((i) => i.line_id !== line_id) }),
   
-      clear: () => {  
-        set({ items: [] });  
-      },
+      clear: () => set({ items: [] }),
   
-      setQuantity: (id, quantity) => {  
+      setQuantity: (line_id, quantity) => {  
         if (quantity <= 0) {  
-          set({ items: get().items.filter((i) => i.id !== id) });  
-        } else {  
-          set({  
-            items: get().items.map((i) =>  
-              i.id === id ? { ...i, quantity } : i  
-            ),  
-          });  
+          set({ items: get().items.filter((i) => i.line_id !== line_id) });  
+          return;  
         }  
+        set({  
+          items: get().items.map((i) =>  
+            i.line_id === line_id ? { ...i, quantity } : i  
+          ),  
+        });  
       },  
     }),  
-    {  
-      name: 'cart-store', // key in localStorage  
-    }  
+    { name: 'cart-store-v2' } // new key to avoid old localStorage structure conflicts  
   )  
 );  

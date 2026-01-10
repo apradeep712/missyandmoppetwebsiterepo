@@ -65,7 +65,7 @@ export default function NewbornKitTeaser() {
               <div className="absolute inset-0">  
         {/* eslint-disable-next-line @next/next/no-img-element */}  
         <img  
-          src="/hero/hero-3.jpg" // put your real image path here  
+          src="/newborn/mainkit.jpg" // put your real image path here  
           alt="Customize Missy & Mopet outfit"  
           className="h-full w-full object-cover"  
         />  

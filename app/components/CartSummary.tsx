@@ -1,7 +1,7 @@
 'use client';
   
 import Link from 'next/link';  
-import { useCartStore } from '@/lib/cartStore';
+import { useCartStore } from '@/app/store/cartStore';
   
 export default function CartSummary() {  
   const items = useCartStore((state) => state.items);

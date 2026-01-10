@@ -1,6 +1,6 @@
 'use client';
   
-import { useState } from 'react';  
+import { useMemo, useState } from 'react';  
 import { useTryAtHomeStore } from '@/app/store/tryAtHomeStore';
   
 type TryAtHomeButtonClientProps = {  
@@ -14,10 +14,15 @@ type TryAtHomeButtonClientProps = {
   };  
 };
   
-export default function TryAtHomeButtonClient({  
-  product,  
-}: TryAtHomeButtonClientProps) {  
-  const { addItem } = useTryAtHomeStore();  
+export default function TryAtHomeButtonClient({ product }: TryAtHomeButtonClientProps) {  
+  const items = useTryAtHomeStore((s) => s.items);  
+  const addItem = useTryAtHomeStore((s) => s.addItem);
+  
+  const alreadyAdded = useMemo(  
+    () => items.some((i) => i.id === product.id),  
+    [items, product.id]  
+  );
+  
   const [message, setMessage] = useState<string | null>(null);  
   const [error, setError] = useState<string | null>(null);
   
@@ -34,11 +39,8 @@ export default function TryAtHomeButtonClient({
       currency: product.currency,  
     });
   
-    if (result.ok) {  
-      setMessage('Added to Try at home selection.');  
-    } else if (result.reason) {  
-      setError(result.reason);  
-    }  
+    if (result.ok) setMessage(alreadyAdded ? 'Already in your selection.' : 'Added to Try at home.');  
+    else if (result.reason) setError(result.reason);  
   };
   
   return (  
@@ -46,16 +48,19 @@ export default function TryAtHomeButtonClient({
       <button  
         type="button"  
         onClick={handleClick}  
-        className="w-full rounded-full border border-[#ead8cd] bg-white px-4 py-2 text-sm font-medium text-[#4b3b33] hover:bg-[#fdf2e9]"  
+        disabled={alreadyAdded}  
+        className={[  
+          'w-full rounded-full border px-4 py-2 text-sm font-medium transition',  
+          alreadyAdded  
+            ? 'cursor-not-allowed border-[#ead8cd] bg-[#fdf2e9] text-[#7c675b]'  
+            : 'border-[#ead8cd] bg-white text-[#4b3b33] hover:bg-[#fdf2e9]',  
+        ].join(' ')}  
       >  
-        Add to Try at home  
-      </button>  
-      {message && (  
-        <p className="text-[11px] text-emerald-600">{message}</p>  
-      )}  
-      {error && (  
-        <p className="text-[11px] text-[#a85454]">{error}</p>  
-      )}  
+        {alreadyAdded ? 'Added to Try at home' : 'Add to Try at home'}  
+      </button>
+  
+      {message && <p className="text-[11px] text-emerald-600">{message}</p>}  
+      {error && <p className="text-[11px] text-[#a85454]">{error}</p>}  
     </div>  
   );  
 }  

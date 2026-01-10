@@ -71,8 +71,12 @@ export default function HomeSubscriptionTrySection() {
             {/* Visual placeholder for image */}  
             <div className="mt-4 flex-1 rounded-2xl bg-[#f4e3d7] flex items-center justify-center text-xs text-[#8a4b5a]">  
               {/* Replace this with a real try-at-home image when you have it */}  
-              Try-at-home visual goes here – parent & child checking outfits at  
-              home.  
+              
+               <img 
+                src="/try/trial2.png" 
+                alt="Styling and fabrics"
+                className="h-full w-full object-cover"
+              />
             </div>
   
             <div className="mt-4 flex justify-between items-center text-xs text-[#7c675b]">  
