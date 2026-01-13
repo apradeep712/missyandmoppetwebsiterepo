@@ -1,149 +1,84 @@
 'use client';
-  
-import Link from 'next/link';  
-import HomeHeader from '@/app/components/HomeHeader';  
-import { useCartStore } from '@/app/store/cartStore';  
-import { formatAgeFromMonths } from '@/lib/ageSizing';
-  
-function formatMoney(price_cents: number, currency: string) {  
-  const amount = price_cents / 100;  
-  if (currency === 'INR') return `₹${amount.toFixed(2)}`;  
-  return `${amount.toFixed(2)} ${currency}`;  
-}
-  
-export default function CartPage() {  
-  const items = useCartStore((s) => s.items);  
-  const removeItem = useCartStore((s) => s.removeItem);  
-  const setQuantity = useCartStore((s) => s.setQuantity);  
-  const clear = useCartStore((s) => s.clear);
-  
-  // If you ever allow mixed currencies, you should compute totals per currency.  
-  // For now, we assume all items share the same currency (typical for a single-store checkout).  
-  const currency = items[0]?.currency ?? 'INR';
-  
+
+import { useState } from 'react';
+import Link from 'next/link';
+import HomeHeader from '@/app/components/HomeHeader';
+import { useCartStore } from '@/app/store/cartStore';
+import CheckoutCartClient from '@/app/components/CheckoutCartClient';
+
+export default function CartPage() {
+  const { items, removeItem, setQuantity } = useCartStore();
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+
   const totalCents = items.reduce((sum, item) => sum + item.price_cents * item.quantity, 0);
-  
-  return (  
-    <main className="min-h-screen bg-[#fdf7f2] text-[#4b3b33]">  
+
+  if (items.length === 0) {
+    return (
+      <main className="min-h-screen bg-[#fdf7f2]">
+        <HomeHeader />
+        <div className="mx-auto max-w-4xl px-4 py-20 text-center">
+          <h1 className="text-2xl font-serif text-[#4b3b33]">Your cart is empty</h1>
+          <Link href="/shop" className="mt-4 inline-block text-[#a07d68] underline">Continue Shopping</Link>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-[#fdf7f2] text-[#4b3b33] pb-20">
       <HomeHeader />
-  
-      <div className="mx-auto max-w-4xl px-4 py-8">  
-        <h1 className="mb-4 text-2xl font-semibold text-[#4b3b33]">Your cart</h1>
-  
-        {items.length === 0 ? (  
-          <div className="rounded-2xl border border-[#ead8cd] bg-white/90 p-6 text-sm text-[#7c675b]">  
-            Your cart is empty.  
-            <div className="mt-2">  
-              <Link href="/shop" className="text-[#4b3b33] underline underline-offset-4">  
-                Browse products  
-              </Link>  
-            </div>  
-          </div>  
-        ) : (  
-          <div className="space-y-4">  
-            <section className="space-y-3 rounded-2xl border border-[#ead8cd] bg-white/90 p-4">  
-              {items.map((item) => (  
-                <div  
-                  key={item.line_id}  
-                  className="flex items-center justify-between gap-3 rounded-xl border border-[#ead8cd] bg-[#fdf7f2] p-3 text-xs sm:text-sm"  
-                >  
-                  <div className="flex items-center gap-3">  
-                    <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-lg bg-[#f4e3d7]">  
-                      {item.image_url ? (  
-                        // eslint-disable-next-line @next/next/no-img-element  
-                        <img  
-                          src={item.image_url}  
-                          alt={item.name}  
-                          className="h-full w-full object-cover"  
-                        />  
-                      ) : (  
-                        <div className="flex h-full w-full items-center justify-center text-[10px] text-[#a07d68]">  
-                          No image  
-                        </div>  
-                      )}  
-                    </div>
-  
-                    <div>  
-                      <div className="font-medium text-[#4b3b33]">{item.name}</div>
-  
-                      {/* Price */}  
-                      <div className="text-[11px] text-[#7c675b]">  
-                        {formatMoney(item.price_cents, item.currency)}  
+      <div className="mx-auto max-w-6xl px-4 py-8">
+        <h1 className="text-3xl font-serif font-bold mb-8 text-center">
+          {isCheckingOut ? 'Finalize Order' : 'Your Shopping Cart'}
+        </h1>
+
+        <div className="flex flex-col items-center">
+          {!isCheckingOut ? (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 w-full">
+              <div className="lg:col-span-8 space-y-4">
+                <div className="rounded-[2rem] border border-[#ead8cd] bg-white p-6 shadow-sm">
+                  {items.map((item) => (
+                    <div key={item.line_id} className="flex items-center gap-4 py-6 border-b border-[#ead8cd]/30 last:border-0">
+                      <div className="h-24 w-24 bg-[#f4e3d7] rounded-2xl overflow-hidden flex-shrink-0">
+                        {item.image_url && <img src={item.image_url} alt={item.name} className="h-full w-full object-cover" />}
                       </div>
-  
-                      {/* Size (age) */}  
-                      {item.selected_age_months !== null && (  
-                        <div className="mt-0.5 text-[11px] text-[#7c675b]">  
-                          Size: {formatAgeFromMonths(item.selected_age_months)}  
-                        </div>  
-                      )}  
-                    </div>  
-                  </div>
-  
-                  <div className="flex items-center gap-3">  
-                    {/* Quantity controls */}  
-                    <div className="flex items-center gap-1">  
-                      <button  
-                        type="button"  
-                        onClick={() => setQuantity(item.line_id, item.quantity - 1)}  
-                        className="h-6 w-6 rounded-full border border-[#ead8cd] text-[12px] text-[#4b3b33]"  
-                      >  
-                        -  
-                      </button>  
-                      <span className="w-6 text-center text-[12px]">{item.quantity}</span>  
-                      <button  
-                        type="button"  
-                        onClick={() => setQuantity(item.line_id, item.quantity + 1)}  
-                        className="h-6 w-6 rounded-full border border-[#ead8cd] text-[12px] text-[#4b3b33]"  
-                      >  
-                        +  
-                      </button>  
+                      <div className="flex-1">
+                        <h3 className="font-bold text-sm">{item.name}</h3>
+                        <p className="text-[10px] text-[#a07d68] uppercase mb-2">Age: {item.selected_age_months || 'N/A'}M</p>
+                        <div className="flex items-center gap-4">
+                          <button onClick={() => setQuantity(item.line_id, item.quantity - 1)} className="h-8 w-8 rounded-full border border-[#ead8cd]">-</button>
+                          <span className="text-sm font-bold">{item.quantity}</span>
+                          <button onClick={() => setQuantity(item.line_id, item.quantity + 1)} className="h-8 w-8 rounded-full border border-[#ead8cd]">+</button>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-sm mb-2">₹{(item.price_cents / 100).toFixed(2)}</p>
+                        <button onClick={() => removeItem(item.line_id)} className="text-[#a85454] text-[10px] font-bold uppercase tracking-widest">Remove</button>
+                      </div>
                     </div>
-  
-                    <button  
-                      type="button"  
-                      onClick={() => removeItem(item.line_id)}  
-                      className="rounded-full border border-[#f5c2c2] bg-[#fee2e2] px-3 py-1 text-[11px] text-[#a85454] hover:bg-[#fecaca]"  
-                    >  
-                      Remove  
-                    </button>  
-                  </div>  
-                </div>  
-              ))}  
-            </section>
-  
-            <section className="rounded-2xl border border-[#ead8cd] bg-white/90 p-4 text-sm">  
-              <div className="flex items-center justify-between">  
-                <span className="font-medium text-[#4b3b33]">Subtotal</span>  
-                <span className="font-semibold text-[#4b3b33]">  
-                  {formatMoney(totalCents, currency)}  
-                </span>  
+                  ))}
+                </div>
               </div>
-  
-              <p className="mt-2 text-[11px] text-[#7c675b]">  
-                Taxes and shipping will be calculated at checkout.  
-              </p>
-  
-              <div className="mt-4 flex flex-wrap items-center gap-3">  
-                <button  
-                  type="button"  
-                  className="rounded-full bg-[#4b3b33] px-5 py-2 text-sm font-medium text-[#fdf7f2] hover:bg-[#3a2e29]"  
-                >  
-                  Proceed to checkout  
-                </button>
-  
-                <button  
-                  type="button"  
-                  onClick={clear}  
-                  className="text-[11px] text-[#a85454] underline underline-offset-4"  
-                >  
-                  Clear cart  
-                </button>  
-              </div>  
-            </section>  
-          </div>  
-        )}  
-      </div>  
-    </main>  
-  );  
-}  
+              <div className="lg:col-span-4">
+                <div className="rounded-[2rem] bg-[#4b3b33] p-8 text-[#fdf7f2] shadow-xl sticky top-24">
+                  <div className="flex justify-between items-center mb-6">
+                    <span className="text-xs opacity-70 uppercase tracking-widest">Total Amount</span>
+                    <span className="text-2xl font-serif">₹{(totalCents / 100).toFixed(2)}</span>
+                  </div>
+                  <button onClick={() => setIsCheckingOut(true)} className="w-full rounded-full bg-white py-4 text-sm font-bold text-[#4b3b33]">
+                    Proceed to Checkout
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="w-full max-w-2xl">
+              <button onClick={() => setIsCheckingOut(false)} className="mb-6 text-[10px] font-bold uppercase tracking-widest text-[#a07d68]">← Return to Cart</button>
+              <CheckoutCartClient />
+            </div>
+          )}
+        </div>
+      </div>
+    </main>
+  );
+}

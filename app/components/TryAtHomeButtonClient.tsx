@@ -56,7 +56,7 @@ export default function TryAtHomeButtonClient({ product }: TryAtHomeButtonClient
             : 'border-[#ead8cd] bg-white text-[#4b3b33] hover:bg-[#fdf2e9]',  
         ].join(' ')}  
       >  
-        {alreadyAdded ? 'Added to Try at home' : 'Add to Try at home'}  
+        {alreadyAdded ? 'Added to Try at home' : 'Try at home'}  
       </button>
   
       {message && <p className="text-[11px] text-emerald-600">{message}</p>}  

@@ -10,7 +10,8 @@ type Profile = {
   phone: string | null;  
   child_name: string | null;  
   child_gender: string | null;  
-  child_age_group: string | null;  
+  child_age_group: string | null; 
+  child_birthday: string | null; // Add this line 
 };
 
 export default function AccountPage() {  
@@ -26,6 +27,7 @@ export default function AccountPage() {
     child_name: '',  
     child_gender: '',  
     child_age_group: '',  
+    child_birthday: '',
   });  
   const [saving, setSaving] = useState(false);  
   const [message, setMessage] = useState<string | null>(null);  
@@ -42,7 +44,7 @@ export default function AccountPage() {
       setUserId(user.id);
       const { data: existing, error } = await supabase  
         .from('users')  
-        .select('name, email, phone, child_name, child_gender, child_age_group')  
+        .select('name, email, phone, child_name, child_gender, child_age_group,child_birthday')  
         .eq('id', user.id)  
         .maybeSingle();
       if (error) console.error(error);  
@@ -54,6 +56,7 @@ export default function AccountPage() {
         child_name: existing?.child_name ?? '',  
         child_gender: existing?.child_gender ?? '',  
         child_age_group: existing?.child_age_group ?? '',  
+        child_birthday: existing?.child_birthday ?? '',  
       });
       setLoading(false);  
     };
@@ -78,6 +81,7 @@ export default function AccountPage() {
           child_name: profile.child_name || null,  
           child_gender: profile.child_gender || null,  
           child_age_group: profile.child_age_group || null,  
+          child_birthday: profile.child_birthday || null,  
         },  
         { onConflict: 'id' }  
       );
@@ -179,7 +183,19 @@ export default function AccountPage() {
                         <option value="boy">Boy</option>  
                         <option value="neutral">Neutral / Prefer not to say</option>  
                       </select>  
-                    </div>  
+                    </div> 
+                    {/* Inside the Child Section grid */}
+<div>  
+  <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[#a07d68]">
+    Birthday
+  </label>  
+  <input 
+    type="date" 
+    value={profile.child_birthday || ''} 
+    onChange={handleChange('child_birthday')} 
+    className="w-full rounded-xl border border-[#ead8cd] bg-[#fdf7f2]/50 px-4 py-3 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-[#ead8cd] color-[#4b3b33]" 
+  />  
+</div> 
                     <div>  
                       <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-[#a07d68]">Age Group</label>  
                       <select value={profile.child_age_group || ''} onChange={handleChange('child_age_group')} className="w-full rounded-xl border border-[#ead8cd] bg-[#fdf7f2]/50 px-4 py-3 text-sm outline-none focus:bg-white focus:ring-2 focus:ring-[#ead8cd] appearance-none">  
@@ -229,7 +245,10 @@ export default function AccountPage() {
               <button className="mt-4 text-sm font-bold text-[#4b3b33] underline underline-offset-4 hover:text-[#a07d68] transition-colors">
                 Contact Concierge
               </button>
+              
+              
             </div>
+            
           </div>
 
         </div>

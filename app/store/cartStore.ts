@@ -1,5 +1,5 @@
 'use client';
-  
+
 import { create } from 'zustand';  
 import { persist } from 'zustand/middleware';
   
@@ -49,8 +49,7 @@ export const useCartStore = create<CartState>()(
         if (current.length >= 5) {  
           return {  
             ok: false,  
-            reason:  
-              'You can keep up to 5 different products in your cart. Please remove one to add another.',  
+            reason: 'You can keep up to 5 different products in your cart.',  
           };  
         }
   
@@ -74,6 +73,6 @@ export const useCartStore = create<CartState>()(
         });  
       },  
     }),  
-    { name: 'cart-store-v2' } // new key to avoid old localStorage structure conflicts  
+    { name: 'cart-store-v2' }
   )  
-);  
+);
