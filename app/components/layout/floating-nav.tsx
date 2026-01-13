@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { motion, useScroll, useMotionValueEvent } from "framer-motion";
-import { useShopStore } from "../../store/use-shop-store";
-
+import { useCartStore } from "@/app/store/cartStore"; // Ensure this path is correct
 import { ShoppingBag, User, Menu as MenuIcon } from "lucide-react";
 import Link from "next/link";
 
 export default function FloatingNav() {
-  const { cart, trialItems, toggleCart } = useShopStore();
+  // FIXED: Destructure 'items' instead of 'cart'. 
+  // Removed 'trialItems' and 'toggleCart' as they aren't in your store.
+  const { items } = useCartStore(); 
   const [isScrolled, setIsScrolled] = useState(false);
   const { scrollY } = useScroll();
 
@@ -17,7 +18,8 @@ export default function FloatingNav() {
     setIsScrolled(latest > 50);
   });
 
-  const totalItems = cart.length + trialItems.length;
+  // FIXED: totalItems now just counts the length of 'items'
+  const totalItems = items.length;
 
   return (
     <header className="fixed top-0 left-0 right-0 z-[100] flex justify-center p-4 sm:p-6 pointer-events-none">
@@ -31,7 +33,7 @@ export default function FloatingNav() {
             : "bg-transparent border-transparent"}
         `}
       >
-        {/* LEFT: Branding (Existing Redirection) */}
+        {/* LEFT: Branding */}
         <Link href="/" className="flex flex-col group">
           <span className="text-[11px] font-bold tracking-[0.3em] uppercase text-neutral-900">
             Missy & Moppet
@@ -41,7 +43,7 @@ export default function FloatingNav() {
           </span>
         </Link>
 
-        {/* RIGHT: Actions & Old Menu Integration */}
+        {/* RIGHT: Actions */}
         <div className="flex items-center gap-2 sm:gap-6">
           <div className="flex items-center gap-1 sm:gap-4 pr-2 sm:pr-4 border-r border-neutral-200">
             {/* Account */}
@@ -50,8 +52,8 @@ export default function FloatingNav() {
             </Link>
 
             {/* Cart Trigger */}
-            <button 
-              onClick={() => toggleCart(true)}
+            <Link 
+              href="/cart"
               className="relative p-2 text-neutral-800 hover:opacity-50 transition-opacity"
             >
               <ShoppingBag size={18} strokeWidth={1.5} />
@@ -60,16 +62,14 @@ export default function FloatingNav() {
                   {totalItems}
                 </span>
               )}
-            </button>
+            </Link>
           </div>
 
-          {/* THE OLD MENU TRIGGER: This keeps your existing sidebar/redirections */}
+          {/* THE MENU TRIGGER */}
           <button 
             className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-neutral-900 text-white hover:bg-neutral-800 transition-all"
             onClick={() => {
-              // Trigger your existing menu logic here 
-              // Example: window.dispatchEvent(new CustomEvent('open-menu'))
-              console.log("Existing menu triggered");
+              console.log("Menu triggered");
             }}
           >
             <span className="text-[10px] font-bold uppercase tracking-widest pl-1 hidden sm:block">Menu</span>
