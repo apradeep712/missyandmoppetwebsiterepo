@@ -34,7 +34,7 @@ export default function SocialStrip() {
           </div>
           <div className="flex flex-col items-start gap-1 text-xs text-stone-600 sm:items-end sm:text-sm">
             <Link
-              href="https://instagram.com/missyandmopet"
+              href="https://www.instagram.com/missyandmoppet/"
               target="_blank"
               className="inline-flex items-center gap-2 text-pink-500 hover:text-pink-400"
             >

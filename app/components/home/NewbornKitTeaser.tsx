@@ -34,16 +34,16 @@ export default function NewbornKitTeaser() {
               Customised on request  
             </li>  
           </ul>
-  
-          <div className="mt-5 flex flex-wrap gap-3">  
+  <div className="mt-6 flex flex-wrap gap-3 text-xs">  
             <Link  
-              href="/newborn-kit"  
-              className="inline-flex items-center justify-center rounded-full bg-slate-900 px-6 py-2.5 text-sm font-semibold text-slate-50 hover:bg-slate-800"  
+              href="/newborn-kit" 
+              className="inline-flex items-center rounded-full bg-[#4b3b33] px-5 py-2 text-sm font-medium text-[#fdf7f2] hover:bg-[#3a2e29]"  
             >  
-              Explore newborn kit  
+              Explore newborn kit    
             </Link>  
            
           </div>  
+         
         </motion.div>
   
         <motion.div  

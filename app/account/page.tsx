@@ -243,7 +243,9 @@ export default function AccountPage() {
                 Need help with your profile or an existing order? Our concierge team is here for you.
               </p>
               <button className="mt-4 text-sm font-bold text-[#4b3b33] underline underline-offset-4 hover:text-[#a07d68] transition-colors">
-                Contact Concierge
+                missyandmoppet@gmail.com
+
+                
               </button>
               
               

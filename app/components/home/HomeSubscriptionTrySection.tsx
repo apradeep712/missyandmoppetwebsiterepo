@@ -78,18 +78,18 @@ export default function HomeSubscriptionTrySection() {
                 className="h-full w-full object-cover"
               />
             </div>
-  
-            <div className="mt-4 flex justify-between items-center text-xs text-[#7c675b]">  
-              <button  
-                type="button"  
-                className="inline-flex items-center rounded-full bg-white px-4 py-2 font-medium text-[#4b3b33] hover:bg-[#fdf2e9] border border-[#ead8cd]"  
-              >  
-                <Link href="/try-at-home">Try at home</Link>  
-              </button>  
-              <span className="text-[11px] text-[#a07d68]">  
-                Softness &amp; fit checked before you buy.  
-              </span>  
-            </div>  
+    <div className="mt-6 flex flex-wrap gap-3 text-xs">  
+            <Link  
+              href="/try-at-home" 
+              className="inline-flex items-center rounded-full bg-[#4b3b33] px-5 py-2 text-sm font-medium text-[#fdf7f2] hover:bg-[#3a2e29]"  
+            >  
+              Try at home  
+            </Link>  
+            <p className="text-[11px] text-[#a07d68]">  
+              Softness &amp; fit checked before you buy. 
+            </p>  
+          </div>  
+           
           </div>  
         </motion.div>  
       </div>  
