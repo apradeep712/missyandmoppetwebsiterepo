@@ -17,7 +17,7 @@ export default function AboutPage() {
   const images = [
     "/about/founder.PNG",
     "/about/founder2.jpg", 
-    "/about/founder.PNG", // Adding a 3rd image as requested (placeholder)
+     // Adding a 3rd image as requested (placeholder)
   ];
 
   useEffect(() => {
@@ -98,25 +98,47 @@ export default function AboutPage() {
             <p className="mt-6 text-lg text-[#9A8C7D] font-medium">— Anushree Nambiar, Founder</p>
           </div>
 
-          {/* CELL 2: VISUAL (Fixed Carousel) */}
-          <div className="md:col-span-4 relative rounded-[2rem] overflow-hidden group grid items-stretch">
-            <AnimatePresence mode="popLayout">
-              <motion.img
-                key={currentImg}
-                src={images[currentImg]}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.8 }}
-                loading="eager"
-                // Using grid-area to stack images and prevent layout collapse
-                className="col-start-1 row-start-1 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
-                alt="Anushree and baby" 
-              />
-            </AnimatePresence>
-            <div className="absolute inset-0 bg-[#4A4238]/10 group-hover:bg-transparent transition-colors pointer-events-none" />
-            <div className="absolute bottom-6 left-6 text-white font-bold uppercase tracking-widest text-xs pointer-events-none">The Catalyst</div>
-          </div>
+ {/* CELL 2: VISUAL (Clean White Gallery Style) */}
+<div className="md:col-span-4 relative rounded-[2rem] overflow-hidden group min-h-[450px] bg-white border border-[#EBEBEB] shadow-sm">
+  <AnimatePresence mode="wait">
+    <motion.div
+      key={currentImg}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      className="absolute inset-0 w-full h-full flex items-center justify-center"
+    >
+      {/* Using object-contain and p-8 ensures the image 
+          is never cropped and has an elegant white margin 
+      */}
+      <img
+        src={images[currentImg]}
+        className="w-full h-full object-contain p-8 transition-transform duration-700 group-hover:scale-105"
+        alt="Founder and brand story"
+      />
+    </motion.div>
+  </AnimatePresence>
+  
+  {/* Minimalist "The Catalyst" Tag */}
+  <div className="absolute bottom-6 left-6 z-20">
+    <span className="bg-[#FAFAF5] text-[#4A4238] border border-[#EBEBEB] font-bold uppercase tracking-widest text-[9px] px-3 py-1.5 rounded-full shadow-sm">
+      The Catalyst
+    </span>
+  </div>
+
+  {/* Refined Progress Indicators */}
+  <div className="absolute bottom-7 right-8 flex gap-2 z-20">
+    {images.map((_, i) => (
+      <div 
+        key={i} 
+        className={`h-1 rounded-full transition-all duration-500 ${
+          i === currentImg ? 'w-6 bg-[#D4C5B0]' : 'w-1.5 bg-[#EBEBEB]'
+        }`} 
+      />
+    ))}
+  </div>
+</div>
 
           <div className="md:col-span-4 bg-[#FFF0F5] p-10 rounded-[2rem] flex flex-col justify-between relative overflow-hidden">
             <div className="relative z-10">

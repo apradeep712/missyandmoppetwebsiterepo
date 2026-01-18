@@ -64,15 +64,52 @@ export default function LoaderShell({
                 transition={{ duration: 4, times: [0, 0.5, 1], ease: "easeInOut" }}
                 className="relative"
               >
-                <div className="h-40 w-40 md:h-56 md:w-56 overflow-hidden rounded-full border-[0.5px] border-pink-100 bg-white p-2 shadow-[0_20px_80px_rgba(224,242,254,0.6)]">
-                  <img src="/hero/logomain.png" alt="Logo" className="h-full w-full object-cover" />
-                  <motion.div 
-                    className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/60 to-transparent"
-                    initial={{ x: '-150%', skewX: -45 }}
-                    animate={{ x: '150%' }}
-                    transition={{ delay: 1, duration: 2, repeat: Infinity, repeatDelay: 1 }}
-                  />
-                </div>
+                <div className="relative group">
+  {/* 1. AMBIENT GLOW: Soft pulsing light that breaks the square boundary */}
+  <motion.div
+    className="absolute -inset-8 rounded-full bg-gradient-to-r from-blue-50 via-pink-50 to-sky-50 opacity-60 blur-3xl"
+    animate={{
+      scale: [1, 1.2, 1],
+      rotate: [0, 90, 180, 270, 360],
+    }}
+    transition={{
+      duration: 20,
+      repeat: Infinity,
+      ease: "linear",
+    }}
+  />
+
+  {/* 2. THE IMAGE CONTAINER: Using mask-mode to hide the square corners */}
+  <div className="relative h-48 w-48 md:h-72 md:w-72 flex items-center justify-center">
+    
+    {/* SVG Mask to create a soft, high-end "Organic" shape */}
+    <div className="relative w-full h-full overflow-hidden [mask-image:radial-gradient(circle,white_60%,transparent_100%)]">
+      
+      <img 
+        src="/hero/logoai.png" 
+        alt="Logo" 
+        className="h-full w-full object-contain transform group-hover:scale-110 transition-transform duration-700 ease-out" 
+      />
+
+      {/* 3. REFLECTIVE SWEEP: High-end "Glass" shine */}
+      <motion.div 
+        className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/40 to-transparent"
+        initial={{ x: '-100%', skewX: -20 }}
+        animate={{ x: '200%' }}
+        transition={{ 
+          delay: 2.5, 
+          duration: 1.8, 
+          repeat: Infinity, 
+          repeatDelay: 4,
+          ease: "easeInOut" 
+        }}
+      />
+    </div>
+
+    {/* 4. FLOATING BORDER: A thin, elegant ring around the logo */}
+    <div className="absolute inset-0 rounded-full border border-[#fdf2f8]/50 shadow-[inset_0_0_20px_rgba(255,255,255,0.8)] pointer-events-none" />
+  </div>
+</div>
               </motion.div>
 
               {/* TEXT SECTION */}
@@ -86,7 +123,7 @@ export default function LoaderShell({
                   Missy & Moppet
                 </motion.h1>
                 <motion.p className="mt-4 font-serif italic text-lg text-[#a07d68]">
-                  Loading Experience
+                  Curating Childhood Elegance
                 </motion.p>
               </div>
 
