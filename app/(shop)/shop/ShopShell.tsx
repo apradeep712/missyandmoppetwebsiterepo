@@ -20,15 +20,30 @@ function buildHref(pathname: string, sp: URLSearchParams, patch: Record<string, 
 }
 
 // LUXURY COMPONENT: Refined Chip with spring animation
-function ChipLink({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
+function ChipLink({ 
+  href, 
+  active, 
+  children, 
+  disabled 
+}: { 
+  href: string; 
+  active: boolean; 
+  children: React.ReactNode;
+  disabled?: boolean;
+}) {
   return (
-    <Link href={href} className="relative group">
+    <Link 
+      href={disabled ? '#' : href} 
+      className={`relative group ${disabled ? 'cursor-not-allowed' : ''}`}
+      onClick={(e) => disabled && e.preventDefault()}
+    >
       <motion.div
-        whileTap={{ scale: 0.96 }}
+        whileTap={disabled ? {} : { scale: 0.96 }}
         className={`inline-flex items-center justify-center rounded-full px-5 py-2 text-[13px] tracking-wide transition-all duration-300 border
           ${active 
             ? 'border-[#4b3b33] bg-[#4b3b33] text-[#fdf7f2] shadow-md' 
-            : 'border-[#ead8cd] bg-transparent text-[#7c675b] hover:border-[#4b3b33] hover:text-[#4b3b33]'}`}
+            : 'border-[#ead8cd] bg-transparent text-[#7c675b] hover:border-[#4b3b33] hover:text-[#4b3b33]'}
+          ${disabled ? 'opacity-30 border-[#ead8cd] grayscale' : ''}`}
       >
         {children}
       </motion.div>
@@ -46,6 +61,7 @@ export default function ShopShell({ children }: { children: React.ReactNode }) {
   const ageGroup = (sp.get('ageGroup') as AgeGroupFilter | null) || null;
   const gender = (sp.get('gender') as GenderFilter | null) || null;
   const type = sp.get('type') || null;
+  const isPartywear = sp.get('partywear') === 'true';
 
   const productTypes = [
     { label: 'T-Shirts', value: 't-shirt' }, { label: 'Pants', value: 'pants' },
@@ -56,7 +72,7 @@ export default function ShopShell({ children }: { children: React.ReactNode }) {
     { label: 'Jumpsuit', value: 'jumpsuit' }, { label: 'Coat', value: 'coat' },
   ];
 
-  const activeFiltersCount = (ageGroup ? 1 : 0) + (gender ? 1 : 0) + (type ? 1 : 0);
+  const activeFiltersCount = (ageGroup ? 1 : 0) + (gender ? 1 : 0) + (type ? 1 : 0) + (isPartywear ? 1 : 0);
 
   // Prevent scroll when drawer is open
   useEffect(() => {
@@ -87,7 +103,7 @@ export default function ShopShell({ children }: { children: React.ReactNode }) {
         </button>
 
         <Link
-          href={buildHref(pathname, sp, { ageGroup: null, gender: null, type: null })}
+          href={buildHref(pathname, sp, { ageGroup: null, gender: null, type: null, partywear: null })}
           className="group relative text-xs font-bold uppercase tracking-widest text-[#a27b6a] transition-colors hover:text-[#4b3b33]"
         >
           Clear Filters
@@ -120,7 +136,7 @@ export default function ShopShell({ children }: { children: React.ReactNode }) {
                 <div className="flex items-center justify-between border-b border-[#ead8cd] px-8 py-8">
                   <div>
                     <h2 className="font-serif text-2xl italic text-[#4b3b33]">Bespoke Filters</h2>
-                    <p className="mt-1 text-[11px] uppercase tracking-wider text-[#a27b6a]">Curate your Missy & Mopet view</p>
+                    <p className="mt-1 text-[11px] uppercase tracking-wider text-[#a27b6a]">Curate your Missy & Moppet view</p>
                   </div>
                   <button 
                     onClick={() => setOpen(false)}
@@ -130,47 +146,84 @@ export default function ShopShell({ children }: { children: React.ReactNode }) {
                   </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto px-8 py-10 space-y-12 custom-scrollbar">
-                  {/* Category Sections */}
-                  {[
-                    { title: 'Gender', param: 'gender', options: [['All', null], ['Boys', 'boys'], ['Girls', 'girls']] },
-                    { title: 'Age Group', param: 'ageGroup', options: [['All', null], ['Baby', 'baby'], ['Toddler', 'toddler'], ['Kids', 'kid']] },
-                  ].map((section) => (
-                    <section key={section.title}>
-                      <h3 className="mb-5 text-[11px] font-bold uppercase tracking-[0.2em] text-[#a27b6a]">{section.title}</h3>
-                      <div className="flex flex-wrap gap-3">
-                        {section.options.map(([label, val]) => (
-                          <ChipLink 
-                            key={label}
-                            href={buildHref(pathname, sp, { [section.param]: val })} 
-                            active={section.param === 'gender' ? gender === val : ageGroup === val}
-                          >
-                            {label}
+                <div className="flex-1 overflow-y-auto px-8 py-10 space-y-10 custom-scrollbar">
+                  
+                  {/* --- PARTYWEAR (Main Feature) --- */}
+                  <section>
+                    <h3 className="mb-5 text-[11px] font-bold uppercase tracking-[0.2em] text-[#a27b6a]">Featured Collection</h3>
+                    <Link 
+                      href={buildHref(pathname, sp, { 
+                        partywear: isPartywear ? null : 'true',
+                        // Clear specific filters when entering Partywear mode to focus results
+                        ageGroup: isPartywear ? ageGroup : null, 
+                        gender: isPartywear ? gender : null,
+                        type: isPartywear ? type : null
+                      })}
+                      className={`flex items-center justify-between w-full p-5 rounded-2xl border transition-all duration-300 group
+                        ${isPartywear 
+                          ? 'bg-[#4b3b33] border-[#4b3b33] text-[#fdf7f2] shadow-lg shadow-[#4b3b33]/10' 
+                          : 'bg-white border-[#ead8cd] text-[#4b3b33] hover:border-[#4b3b33]'}`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <span className="text-xl">✨</span>
+                        <div className="text-left">
+                          <p className="text-[13px] font-bold uppercase tracking-wider">Partywear</p>
+                          <p className={`text-[10px] leading-tight ${isPartywear ? 'text-[#ead8cd]' : 'text-[#a27b6a]'}`}>Outfits for celebrations</p>
+                        </div>
+                      </div>
+                      <div className={`flex h-6 w-6 items-center justify-center rounded-full border transition-colors 
+                        ${isPartywear ? 'bg-white border-white text-[#4b3b33]' : 'border-[#ead8cd] text-transparent group-hover:border-[#4b3b33]'}`}>
+                        <svg width="10" height="8" viewBox="0 0 10 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1 4.5L3.5 7L9 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                    </Link>
+                  </section>
+
+                  {/* --- OTHER FILTERS (Blurred when Partywear is active) --- */}
+                  <div className={`space-y-10 transition-all duration-500 ${isPartywear ? 'opacity-40 pointer-events-none filter blur-[1px]' : 'opacity-100'}`}>
+                    {/* Category Sections */}
+                    {[
+                      { title: 'Gender', param: 'gender', options: [['All', null], ['Boys', 'boys'], ['Girls', 'girls']] },
+                      { title: 'Age Group', param: 'ageGroup', options: [['All', null], ['Baby', 'baby'], ['Toddler', 'toddler'], ['Kids', 'kid']] },
+                    ].map((section) => (
+                      <section key={section.title}>
+                        <h3 className="mb-5 text-[11px] font-bold uppercase tracking-[0.2em] text-[#a27b6a]">{section.title}</h3>
+                        <div className="flex flex-wrap gap-3">
+                          {section.options.map(([label, val]) => (
+                            <ChipLink 
+                              key={label as string}
+                              href={buildHref(pathname, sp, { [section.param]: val as string })} 
+                              active={(section.param === 'gender' ? gender : ageGroup) === val}
+                              disabled={isPartywear}
+                            >
+                              {label}
+                            </ChipLink>
+                          ))}
+                        </div>
+                      </section>
+                    ))}
+
+                    {/* Product Type */}
+                    <section>
+                      <h3 className="mb-5 text-[11px] font-bold uppercase tracking-[0.2em] text-[#a27b6a]">Product Type</h3>
+                      <div className="flex flex-wrap gap-2">
+                        <ChipLink href={buildHref(pathname, sp, { type: null })} active={!type} disabled={isPartywear}>All Pieces</ChipLink>
+                        {productTypes.map((t) => (
+                          <ChipLink key={t.value} href={buildHref(pathname, sp, { type: t.value })} active={type === t.value} disabled={isPartywear}>
+                            {t.label}
                           </ChipLink>
                         ))}
                       </div>
                     </section>
-                  ))}
+                  </div>
 
-                  {/* Product Type - Using a slightly more compact layout */}
-                  <section>
-                    <h3 className="mb-5 text-[11px] font-bold uppercase tracking-[0.2em] text-[#a27b6a]">Product Type</h3>
-                    <div className="flex flex-wrap gap-2">
-                      <ChipLink href={buildHref(pathname, sp, { type: null })} active={!type}>All Pieces</ChipLink>
-                      {productTypes.map((t) => (
-                        <ChipLink key={t.value} href={buildHref(pathname, sp, { type: t.value })} active={type === t.value}>
-                          {t.label}
-                        </ChipLink>
-                      ))}
-                    </div>
-                  </section>
-
-                  {/* Sort */}
-                  <section className="pb-10">
+                  {/* Sort (Always available) */}
+                  <section className="pb-6">
                     <h3 className="mb-5 text-[11px] font-bold uppercase tracking-[0.2em] text-[#a27b6a]">Sort By</h3>
                     <div className="flex flex-wrap gap-3">
                       {[['Newest', 'newest'], ['Price ↑', 'price_low'], ['Price ↓', 'price_high']].map(([label, value]) => (
-                        <ChipLink key={value} href={buildHref(pathname, sp, { sort: value as SortOption })} active={sort === value}>
+                        <ChipLink key={value as string} href={buildHref(pathname, sp, { sort: value as SortOption })} active={sort === value}>
                           {label}
                         </ChipLink>
                       ))}

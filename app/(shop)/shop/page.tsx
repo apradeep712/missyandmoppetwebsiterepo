@@ -14,7 +14,8 @@ type Product = {
   created_at: string;  
   age_months: number[] | null;  
   gender: string[] | null;  
-  product_type: string | null;  
+  product_type: string | null;
+  is_partywear: boolean; // Added for completeness
 };
   
 type SortOption = 'newest' | 'price_low' | 'price_high';  
@@ -36,17 +37,23 @@ async function getProducts(
   sort: SortOption,  
   ageGroup?: AgeGroupFilter,  
   gender?: string,  
-  productType?: string  
+  productType?: string,
+  partywear?: boolean // NEW: Added parameter
 ): Promise<Product[]> {  
   const supabase = await getSupabaseServerClient();
   
   let query = supabase  
     .from('products')  
     .select(  
-      'id, name, slug, description, price_cents, currency, image_url, created_at, age_months, gender, product_type'  
+      'id, name, slug, description, price_cents, currency, image_url, created_at, age_months, gender, product_type, is_partywear'  
     )  
     .eq('is_active', true);
   
+  // NEW: Apply Partywear filter
+  if (partywear) {
+    query = query.eq('is_partywear', true);
+  }
+
   if (ageGroup) {  
     const months = monthsForAgeGroup(ageGroup);  
     // @ts-ignore  
@@ -82,13 +89,8 @@ function formatPrice(price_cents: number, currency: string) {
   return `${amount.toFixed(2)} ${currency}`;  
 }
 
-/**
- * 1. THE MAIN EXPORT (The "Shell")
- * This part is static and fast. We wrap the content in Suspense
- * to handle the searchParams build requirement.
- */
 export default function ShopPage(props: {  
-  searchParams: Promise<{ sort?: string; ageGroup?: string; gender?: string; type?: string }>;  
+  searchParams: Promise<{ sort?: string; ageGroup?: string; gender?: string; type?: string; partywear?: string }>;  
 }) {  
   return (
     <div className="py-2">  
@@ -108,12 +110,8 @@ export default function ShopPage(props: {
   );
 }
 
-/**
- * 2. THE DYNAMIC CONTENT
- * This component handles the actual data fetching.
- */
 async function ShopList({ searchParams }: { 
-  searchParams: Promise<{ sort?: string; ageGroup?: string; gender?: string; type?: string }> 
+  searchParams: Promise<{ sort?: string; ageGroup?: string; gender?: string; type?: string; partywear?: string }> 
 }) {
   const sp = await searchParams;
   
@@ -121,11 +119,18 @@ async function ShopList({ searchParams }: {
   const ageGroup = (sp.ageGroup as AgeGroupFilter) || undefined;  
   const gender = sp.gender || undefined;  
   const type = sp.type || undefined;  
+  const isPartywear = sp.partywear === 'true'; // NEW: Parse the boolean from string
   
-  const products = await getProducts(sortParam, ageGroup, gender, type);
+  // NEW: Passed the isPartywear boolean to the fetcher
+  const products = await getProducts(sortParam, ageGroup, gender, type, isPartywear);
 
   if (products.length === 0) {
-    return <p className="text-sm text-[#7c675b]">No products match these filters yet.</p>;
+    return (
+      <div className="py-20 text-center">
+        <p className="text-lg font-serif italic text-[#4b3b33]">No pieces match these filters yet.</p>
+        <p className="text-sm text-[#a27b6a]">Try clearing your selection to see more.</p>
+      </div>
+    );
   }
 
   return (
@@ -135,14 +140,21 @@ async function ShopList({ searchParams }: {
           key={product.id}  
           className="flex flex-col rounded-3xl border border-[#ead8cd] bg-white/85 p-4 shadow-[0_12px_32px_rgba(148,116,96,0.18)]"  
         >  
-          <Link href={`/product/${product.slug}`}>  
-            <div className="mb-3 h-52 overflow-hidden rounded-2xl bg-[#f4e3d7]">  
+          <Link href={`/product/${product.slug}`}> 
+            <div className="relative mb-3 h-52 overflow-hidden rounded-2xl bg-[#f4e3d7]">
+              {/* Badge for Partywear */}
+              {product.is_partywear && (
+                <div className="absolute left-3 top-3 z-10 rounded-full bg-[#4b3b33] px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white">
+                  Partywear
+                </div>
+              )}
+              
               {product.image_url ? (  
                 // eslint-disable-next-line @next/next/no-img-element  
                 <img  
                   src={product.image_url}  
                   alt={product.name}  
-                  className="h-full w-full object-cover"  
+                  className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"  
                 />  
               ) : (  
                 <div className="flex h-full items-center justify-center px-4 text-center text-xs text-[#7c675b]">  
