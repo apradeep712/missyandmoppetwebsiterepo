@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';  
-import { useSupabaseBrowserClient } from '@/app/providers';
+import { useEffect, useState, useMemo } from 'react';  
+import { createClient } from '@supabase/supabase-js';
 
 type RequestRow = {  
   id: string;  
@@ -23,7 +23,12 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default function AdminRequestsPage() {  
-  const supabase = useSupabaseBrowserClient();  
+  // Initialize supabase with environment variables
+  const supabase = useMemo(() => createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  ), []);
+
   const [requests, setRequests] = useState<RequestRow[]>([]);  
   const [loading, setLoading] = useState(true);  
   const [filterType, setFilterType] = useState<string>('all');  
@@ -31,21 +36,38 @@ export default function AdminRequestsPage() {
 
   const loadRequests = async () => {  
     setLoading(true);  
-    const { data, error } = await supabase  
-      .from('requests')  
-      .select('*')  
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase  
+        .from('requests')  
+        .select('*')  
+        .order('created_at', { ascending: false });
 
-    if (!error && data) setRequests(data as RequestRow[]);  
-    setLoading(false);  
+      if (error) {
+        console.error('Supabase Error:', error.message);
+      } else if (data) {
+        setRequests(data as RequestRow[]); 
+      }
+    } catch (err) {
+      console.error('Unexpected Error:', err);
+    } finally {
+      setLoading(false);  
+    }
   };
 
-  useEffect(() => { loadRequests(); }, []);
+  useEffect(() => { 
+    loadRequests(); 
+  }, [supabase]);
 
   const handleStatusChange = async (id: string, newStatus: string) => {  
-    const { error } = await supabase.from('requests').update({ status: newStatus }).eq('id', id);
+    const { error } = await supabase
+      .from('requests')
+      .update({ status: newStatus })
+      .eq('id', id);
+
     if (!error) {
       setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r)));
+    } else {
+      console.error('Update Error:', error.message);
     }
   };
 
@@ -82,6 +104,10 @@ export default function AdminRequestsPage() {
             <option value="closed">✅ Closed</option>  
           </select>  
         </div>  
+        {/* Refresh Button added to help manual testing */}
+        <button onClick={loadRequests} className="ml-auto text-xs font-bold text-[#a07d68] hover:text-[#4b3b33] px-3">
+          ↻ REFRESH
+        </button>
       </section>
 
       {loading ? (  
@@ -96,7 +122,6 @@ export default function AdminRequestsPage() {
         <div className="space-y-4">  
           {filtered.map((r) => (  
             <div key={r.id} className="group relative overflow-hidden rounded-3xl border border-[#ead8cd] bg-white transition-all hover:shadow-md">  
-              {/* Status Indicator Strip */}
               <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
                 r.status === 'new' ? 'bg-orange-400' : r.status === 'contacted' ? 'bg-blue-400' : 'bg-green-500'
               }`} />
@@ -124,7 +149,6 @@ export default function AdminRequestsPage() {
                   </div>  
                 </div>  
 
-                {/* DETAILS GRID */}
                 {r.payload && (  
                   <div className="mt-5 rounded-2xl bg-[#fdf7f2] p-4 border border-[#ead8cd]/50">  
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -141,15 +165,14 @@ export default function AdminRequestsPage() {
                 )} 
 
                 <div className="mt-4 flex items-center justify-between">
-                   <div className="text-[10px] font-medium text-[#a07d68] italic">
+                  <div className="text-[10px] font-medium text-[#a07d68] italic">
                     Referrer: {r.source || 'Direct Website'}
                   </div>
-                  {/* Quick Action Buttons for Mobile */}
                   <div className="flex gap-2">
                     {r.phone && (
-                       <a href={`tel:${r.phone}`} className="md:hidden rounded-full bg-[#4b3b33] p-2 text-white">
+                      <a href={`tel:${r.phone}`} className="md:hidden rounded-full bg-[#4b3b33] p-2 text-white">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                       </a>
+                      </a>
                     )}
                     <a href={`mailto:${r.email}`} className="md:hidden rounded-full bg-[#4b3b33] p-2 text-white">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>

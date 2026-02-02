@@ -362,110 +362,109 @@ const closeModal = () => {
   if (!saving) setModalOpen(false);  
 };
 
-async function onSave(e: React.FormEvent) {  
-  e.preventDefault();  
-  setSaving(true);  
-  setErrorMsg(null);  
+async function onSave(e: React.FormEvent) {
+  e.preventDefault();
+  setSaving(true);
+  setErrorMsg(null);
   setInfoMsg(null);
 
-  try {  
-    const name = form.name.trim();  
+  try {
+    const name = form.name.trim();
     if (!name) throw new Error('Name is required.');
 
-    const slug = form.slug.trim() ? slugify(form.slug) : slugify(name);  
+    const slug = form.slug.trim() ? slugify(form.slug) : slugify(name);
     if (!slug) throw new Error('Slug is required.');
 
-    const pricePaise = toPaiseFromINRString(form.price_inr);  
+    const pricePaise = toPaiseFromINRString(form.price_inr);
     if (pricePaise === null) throw new Error('Price (INR) is invalid.');
 
-    const stockNum = Number(form.stock);  
+    const stockNum = Number(form.stock);
     if (!Number.isInteger(stockNum) || stockNum < 0) throw new Error('Stock must be a non-negative integer.');
 
-    // Always recompute from texts once before save, so admin doesn't need to blur.  
     const computedAgeMonths = computeAgeMonthsFromTexts(form.age_month_points_text, form.age_year_points_text);
 
-    // 1) Upload hero if selected  
-    let imageUrlToSave: string | null = form.image_url.trim() || null;  
-    if (form.image_file) {  
-      const [heroUrl] = await uploadViaAdminApi(slug, [form.image_file]);  
-      imageUrlToSave = heroUrl ?? null;  
+    // --- 1) HERO IMAGE UPLOAD (The Missing Piece) ---
+    let imageUrlToSave: string | null = form.image_url.trim() || null;
+    
+    // If a new file was selected in the input, upload it now
+    if (form.image_file) {
+      const [heroUrl] = await uploadViaAdminApi(slug, [form.image_file]);
+      if (heroUrl) {
+        imageUrlToSave = heroUrl;
+      }
     }
 
-    // 2) Upsert product row first  
-    const payload = {  
-      name,  
-      slug,  
-      description: form.description.trim() || null,  
-      price_cents: pricePaise,  
-      currency: form.currency,  
-      stock: stockNum,  
+    // --- 2) UPSERT PRODUCT ROW ---
+    const payload = {
+      name,
+      slug,
+      description: form.description.trim() || null,
+      price_cents: pricePaise,
+      currency: form.currency,
+      stock: stockNum,
       is_active: form.is_active,
-is_partywear: form.is_partywear, // <-- Add this
-      // save canonical months  
+      is_partywear: form.is_partywear,
       age_months: computedAgeMonths.length ? computedAgeMonths : null,
-
-      image_url: imageUrlToSave,  
-      gender: form.gender.length ? form.gender : null,  
-      product_type: form.product_type.trim() ? form.product_type.trim() : null,  
+      image_url: imageUrlToSave, // Use the newly uploaded URL or existing one
+      gender: form.gender.length ? form.gender : null,
+      product_type: form.product_type.trim() ? form.product_type.trim() : null,
     };
 
-    const operation =  
-      modalMode === 'add'  
-        ? supabase.from('products').insert([payload]).select('id').single()  
+    const operation =
+      modalMode === 'add'
+        ? supabase.from('products').insert([payload]).select('id').single()
         : supabase.from('products').update(payload).eq('id', form.id!).select('id').single();
 
-    const { data: saved, error: saveErr } = await operation;  
+    const { data: saved, error: saveErr } = await operation;
     if (saveErr) throw saveErr;
 
-    const productId = saved?.id as string | undefined;  
+    const productId = saved?.id as string | undefined;
     if (!productId) throw new Error('Failed to get saved product id.');
 
-    // 3) Upload gallery images and write to product_images  
-    if (form.gallery_files.length) {  
+    // --- 3) GALLERY UPLOAD (Your existing logic) ---
+    if (form.gallery_files.length) {
       const galleryUrls = await uploadViaAdminApi(slug, form.gallery_files);
 
-      const { data: existing, error: existingErr } = await supabase  
-        .from('product_images')  
-        .select('sort_order')  
-        .eq('product_id', productId)  
-        .order('sort_order', { ascending: false })  
+      const { data: existing, error: existingErr } = await supabase
+        .from('product_images')
+        .select('sort_order')
+        .eq('product_id', productId)
+        .order('sort_order', { ascending: false })
         .limit(1);
 
       if (existingErr) throw existingErr;
 
       const maxSort = existing?.[0]?.sort_order ?? 0;
-
-      const rows = galleryUrls.map((url, idx) => ({  
-        product_id: productId,  
-        url,  
-        sort_order: maxSort + idx + 1,  
+      const rows = galleryUrls.map((url, idx) => ({
+        product_id: productId,
+        url,
+        sort_order: maxSort + idx + 1,
       }));
 
-      if (rows.length) {  
-        const ins = await supabase.from('product_images').insert(rows);  
-        if (ins.error) throw ins.error;  
-      }  
+      if (rows.length) {
+        const ins = await supabase.from('product_images').insert(rows);
+        if (ins.error) throw ins.error;
+      }
     }
 
-    await loadProducts();  
+    // --- 4) REFRESH & CLEANUP ---
+    await loadProducts();
     setInfoMsg(modalMode === 'add' ? 'Product created.' : 'Product updated.');
-
     await fetchExistingGallery(productId);
 
-    // Clear local file selections; also sync canonical months back into form  
-    setForm((prev) => ({  
-      ...prev,  
-      image_file: null,  
-      gallery_files: [],  
-      age_months: computedAgeMonths,  
+    setForm((prev) => ({
+      ...prev,
+      image_file: null, // Clear the file after success
+      gallery_files: [],
+      age_months: computedAgeMonths,
     }));
 
-    setModalOpen(false);  
-  } catch (e: any) {  
-    setErrorMsg(e?.message ?? 'Failed to save.');  
-  } finally {  
-    setSaving(false);  
-  }  
+    setModalOpen(false);
+  } catch (e: any) {
+    setErrorMsg(e?.message ?? 'Failed to save.');
+  } finally {
+    setSaving(false);
+  }
 }
 
 async function deleteProduct(p: Product) {  

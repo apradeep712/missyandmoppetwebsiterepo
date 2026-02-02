@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';  
-import { useSupabaseBrowserClient } from '@/app/providers';
-
+import { useEffect, useState, useMemo } from 'react';  
+// Removed the broken server actions: import { upsertFlyer, deleteFlyer } from '../actions'; 
+import { createClient } from '@supabase/supabase-js';
 
 type Flyer = {  
   id: string;  
@@ -21,7 +21,12 @@ function getExt(filename: string) {
 }  
 
 export default function AdminHomePage() {  
-  const supabase = useSupabaseBrowserClient();  
+  // Use useMemo to prevent re-initialization on every render
+  const supabase = useMemo(() => createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  ), []);
+  
   const [flyers, setFlyers] = useState<Flyer[]>([]);  
   const [loading, setLoading] = useState(true);
 
@@ -35,27 +40,24 @@ export default function AdminHomePage() {
   const [uploading, setUploading] = useState(false);  
   const [error, setError] = useState<string | null>(null);
 
-
-  
   const loadFlyers = async () => {  
     setLoading(true);  
-    const { data, error } = await supabase  
+    const { data, error: fetchErr } = await supabase  
       .from('homepage_flyers')  
       .select('*')  
       .order('sort_order', { ascending: true });
 
-    if (!error && data) {  
+    if (!fetchErr && data) {  
       setFlyers(data as Flyer[]);  
-    } else if (error) {  
-      console.error(error);  
-      setError(error.message);  
+    } else if (fetchErr) {  
+      setError(fetchErr.message);  
     }  
     setLoading(false);  
   };
 
   useEffect(() => {  
     loadFlyers();  
-  }, []);
+  }, [supabase]);
 
   const resetForm = () => {  
     setEditingId(null);  
@@ -75,19 +77,24 @@ export default function AdminHomePage() {
     setSortOrder(flyer.sort_order);  
     setIsActive(flyer.is_active);  
     setError(null);
-    // Smooth scroll to form for mobile
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   };
 
   const handleDelete = async (id: string) => {  
-    if (!confirm('Delete this flyer?')) return;  
-    const { error } = await supabase.from('homepage_flyers').delete().eq('id', id);  
-    if (error) {  
-      alert('Failed to delete flyer');  
-      return;  
-    }  
-    setFlyers((prev) => prev.filter((f) => f.id !== id));  
-    if (editingId === id) resetForm();  
+    if (!confirm('Delete this flyer?')) return; 
+    
+    // FIX: Using direct client instead of deleteFlyer action
+    const { error: delErr } = await supabase
+      .from('homepage_flyers')
+      .delete()
+      .eq('id', id);
+
+    if (delErr) {
+      alert('Failed to delete: ' + delErr.message);
+    } else {
+      setFlyers((prev) => prev.filter((f) => f.id !== id));  
+      if (editingId === id) resetForm();  
+    }
   };
 
   async function uploadFlyerImage(file: File) {  
@@ -100,7 +107,6 @@ export default function AdminHomePage() {
     const { error: upErr } = await supabase.storage  
       .from('public-assets')  
       .upload(path, file, { upsert: false, contentType: file.type });
-console.log('UPLOAD ERROR:', upErr);  
 
     if (upErr) {  
       setError(upErr.message);  
@@ -125,6 +131,7 @@ console.log('UPLOAD ERROR:', upErr);
     }
 
     const payload = {  
+      id: editingId || crypto.randomUUID(), 
       title: title || null,  
       image_url: imageUrl,  
       link_url: linkUrl || null,  
@@ -132,37 +139,21 @@ console.log('UPLOAD ERROR:', upErr);
       is_active: isActive,  
     };
 
-    if (editingId) {  
-      const { data, error } = await supabase  
-        .from('homepage_flyers')  
-        .update(payload)  
-        .eq('id', editingId)  
-        .select('*')  
-        .maybeSingle();
+    // FIX: Using direct client upsert instead of upsertFlyer action
+    try {
+      const { error: saveErr } = await supabase
+        .from('homepage_flyers')
+        .upsert(payload);
 
-      if (error) setError(error.message);  
-      else if (data) {  
-        setFlyers((prev) => prev.map((f) => (f.id === editingId ? (data as Flyer) : f)));  
-        resetForm();  
-      }  
-    } else {
-        const { data: userData1 } = await supabase.auth.getUser();  
-console.log('USER:', userData1?.user?.email, userData1?.user?.role);  
-      const { data, error } = await supabase  
-        .from('homepage_flyers')  
-        .insert(payload)  
-        .select('*')  
-        .maybeSingle();
-        const { data: userData } = await supabase.auth.getUser();  
-console.log('admin user:', userData?.user?.email, userData?.user?.id);  
+      if (saveErr) throw saveErr;
 
-      if (error) setError(error.message);  
-      else if (data) {  
-        setFlyers((prev) => [...prev, data as Flyer].sort((a, b) => a.sort_order - b.sort_order));  
-        resetForm();  
-      }  
-    }  
-    setSaving(false);  
+      await loadFlyers(); 
+      resetForm();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSaving(false);  
+    }
   };
 
   return (  
@@ -172,7 +163,6 @@ console.log('admin user:', userData?.user?.email, userData?.user?.id);
         <p className="text-sm text-[#7c675b]">Update the main banners on your storefront.</p>
       </header>
   
-      {/* Existing flyers grid */}  
       <section>  
         <h2 className="text-sm font-bold uppercase tracking-wider text-[#a07d68] mb-4">Live Banners</h2>  
         {loading ? (  
@@ -226,7 +216,6 @@ console.log('admin user:', userData?.user?.email, userData?.user?.id);
         )}  
       </section>
 
-      {/* Add/edit form */}  
       <section className="border-t border-[#ead8cd] pt-10">  
         <div className="mb-6">
           <h2 className="text-lg font-bold text-[#4b3b33]">{editingId ? 'Modify Flyer' : 'Create New Banner'}</h2>  
@@ -306,9 +295,6 @@ console.log('admin user:', userData?.user?.email, userData?.user?.id);
                   className="absolute inset-0 cursor-pointer opacity-0"  
                 />  
               </div>
-              <p className="mt-2 text-[10px] text-[#7c675b]">
-                {uploading ? "Uploading to storage..." : "Click image area to upload new file"}
-              </p>
             </div>
 
             <div className="flex justify-end gap-3 pt-4">  
