@@ -82,9 +82,10 @@ className="group inline-flex items-center gap-2 rounded-full border border-white
       {/* Right: Large hero text */}
       <div className="z-10 max-w-xs text-center md:text-right md:w-1/4">
         <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[#b18b74]">
-          We are softness
+          
         </p>
-        <h1 className="mt-3 text-4xl font-semibold leading-[1.1] text-[#3b2c24] sm:text-5xl lg:text-6xl">
+        <h1 className="mt-2 text-5Payment Successful
+xl font-semibold leading-[1.1] text-[#3b2c24] sm:text-5xl lg:text-6xl">
           Missy & Moppet
         </h1>
         <p className="mt-4 text-[11px] text-[#8d6e5c] leading-relaxed">

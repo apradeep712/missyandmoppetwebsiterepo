@@ -38,7 +38,7 @@ export default async function OrderSuccessPage({
           </div>
           <div className="mt-3 flex justify-between text-sm">
             <span className="text-[#a07d68]">Status</span>
-            <span className="font-medium text-green-600">Payment Successful</span>
+            <span className="font-medium text-green-600">Order Successful</span>
           </div>
         </div>
       </div>

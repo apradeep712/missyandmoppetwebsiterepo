@@ -14,7 +14,7 @@ export default async function BuyNowCheckoutPage({
   return (  
     <div className="mx-auto w-full max-w-2xl px-4 py-6">  
       <h1 className="text-lg font-semibold text-[#4b3b33]">Lets go !</h1>  
-      <p className="mt-1 text-sm text-[#7c675b]">Please complete your payment and let our team do the rest</p>
+      <p className="mt-1 text-sm text-[#7c675b]">Please complete your  order and let our team do the rest</p>
   
       <div className="mt-6">  
         <CheckoutBuyNowClient productId={productId} qty={qty} ageMonths={ageMonths} />  
