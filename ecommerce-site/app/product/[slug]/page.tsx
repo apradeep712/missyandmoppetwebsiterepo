@@ -101,11 +101,12 @@ export default async function ProductPage(props: { params: Promise<{ slug: strin
             <div className="flex w-full gap-4 overflow-x-auto lg:flex-col lg:overflow-visible no-scrollbar snap-x snap-mandatory">
               {imageUrls.map((url, idx) => (
                 <div key={idx} className="w-[85vw] flex-shrink-0 snap-center lg:w-full">
-                  <div className="aspect-[4/5] overflow-hidden rounded-2xl bg-[#F4E3D7]/30">
+                  {/* Changed object-cover to object-contain to prevent cropping */}
+                  <div className="aspect-[4/5] overflow-hidden rounded-2xl bg-[#F4E3D7]/30 flex items-center justify-center">
                     <img 
                       src={url} 
                       alt={`${product.name} - ${idx}`} 
-                      className="h-full w-full object-cover"
+                      className="h-full w-full object-contain" 
                     />
                   </div>
                 </div>
@@ -127,11 +128,12 @@ export default async function ProductPage(props: { params: Promise<{ slug: strin
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12">
               {suggested.map((p) => (
                 <Link key={p.id} href={`/product/${p.slug}`} className="group space-y-5">
-                  <div className="aspect-[3/4] overflow-hidden rounded-2xl bg-[#F4E3D7]/20 border border-[#EAD8CD]/40 transition-all duration-700 group-hover:shadow-2xl group-hover:shadow-[#947460]/10">
+                  <div className="aspect-[3/4] overflow-hidden rounded-2xl bg-[#F4E3D7]/20 border border-[#EAD8CD]/40 transition-all duration-700 group-hover:shadow-2xl group-hover:shadow-[#947460]/10 flex items-center justify-center">
                     {p.image_url ? (
                       <img 
                         src={p.image_url} 
-                        className="h-full w-full object-cover transition-transform duration-1000 group-hover:scale-110" 
+                        /* Removed scale-110 to stop the forced zoom-crop on hover */
+                        className="h-full w-full object-contain transition-transform duration-1000" 
                         alt={p.name} 
                       />
                     ) : (

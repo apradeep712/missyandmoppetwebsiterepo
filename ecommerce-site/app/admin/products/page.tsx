@@ -15,7 +15,8 @@ price_cents: number;
 currency: Currency;  
 stock: number;  
 is_active: boolean; 
-is_partywear: boolean; 
+is_partywear: boolean;
+is_bestseller: boolean;  
 image_url: string | null;  
 created_at: string;  
 gender: Gender[] | null;  
@@ -39,7 +40,8 @@ age_year_points_text: string; // e.g. "2,3,4,5,6,7,10,11,13"
 price_inr: string;  
 stock: string;  
 is_active: boolean; 
-is_partywear: boolean; // <-- Add this 
+is_bestseller: boolean; 
+is_partywear: boolean;
 currency: Currency;
 
 // hero  
@@ -239,6 +241,7 @@ const emptyForm: ProductFormState = useMemo(
     stock: '0',  
     is_active: true, 
     is_partywear: false, // <-- Add this 
+    is_bestseller: false, // Default is false
     currency: 'INR',
 
     image_url: '',  
@@ -339,6 +342,7 @@ function openEditModal(p: Product) {
     price_inr: formatINRFromPaise(p.price_cents),  
     stock: String(p.stock ?? 0),  
     is_active: !!p.is_active, 
+    is_bestseller: !!p.is_bestseller,
     is_partywear: !!(p as any).is_partywear, // Use type casting if the Product type isn't updated yet 
     currency: p.currency ?? 'INR',
 
@@ -400,6 +404,7 @@ async function onSave(e: React.FormEvent) {
       currency: form.currency,  
       stock: stockNum,  
       is_active: form.is_active,
+      is_bestseller: form.is_bestseller, // Ensure this is sent
 is_partywear: form.is_partywear, // <-- Add this
       // save canonical months  
       age_months: computedAgeMonths.length ? computedAgeMonths : null,
@@ -928,6 +933,20 @@ return (
           />  
           <label className="text-sm font-bold text-[#4b3b33]">Is this a Party wear ?</label>  
         </div>
+        {/* Bestseller / Priority Toggle */}
+    <div className="flex items-center gap-3">  
+      <input  
+        type="checkbox"  
+        id="bestseller"
+        checked={form.is_bestseller}  
+        onChange={(e) => setForm((prev) => ({ ...prev, is_bestseller: e.target.checked }))}  
+        className="h-5 w-5 rounded-md border-[#ead8cd] text-[#4b3b33] focus:ring-[#4b3b33]"  
+      />  
+      <label htmlFor="bestseller" className="text-sm font-bold text-[#4b3b33] cursor-pointer">
+        🏆 Mark as Community Favorite (Priority)
+      </label>  
+    </div>
+        
         <div className="flex items-center gap-3">  
           <input  
             type="checkbox"  

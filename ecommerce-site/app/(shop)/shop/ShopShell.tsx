@@ -62,6 +62,7 @@ export default function ShopShell({ children }: { children: React.ReactNode }) {
   const gender = (sp.get('gender') as GenderFilter | null) || null;
   const type = sp.get('type') || null;
   const isPartywear = sp.get('partywear') === 'true';
+  const isBestseller = sp.get('bestseller') === 'true';
 
   const productTypes = [
     { label: 'T-Shirts', value: 't-shirt' }, { label: 'Pants', value: 'pants' },
@@ -72,7 +73,7 @@ export default function ShopShell({ children }: { children: React.ReactNode }) {
     { label: 'Jumpsuit', value: 'jumpsuit' }, { label: 'Coat', value: 'coat' },
   ];
 
-  const activeFiltersCount = (ageGroup ? 1 : 0) + (gender ? 1 : 0) + (type ? 1 : 0) + (isPartywear ? 1 : 0);
+  const activeFiltersCount = (ageGroup ? 1 : 0) + (gender ? 1 : 0) + (type ? 1 : 0) + (isPartywear ? 1 : 0)+ (isBestseller ? 1 : 0);
 
   // Prevent scroll when drawer is open
   useEffect(() => {
@@ -103,7 +104,8 @@ export default function ShopShell({ children }: { children: React.ReactNode }) {
         </button>
 
         <Link
-          href={buildHref(pathname, sp, { ageGroup: null, gender: null, type: null, partywear: null })}
+          href={buildHref(pathname, sp, { ageGroup: null, gender: null, type: null, partywear: null,
+    bestseller: null })}
           className="group relative text-xs font-bold uppercase tracking-widest text-[#a27b6a] transition-colors hover:text-[#4b3b33]"
         >
           Clear Filters
