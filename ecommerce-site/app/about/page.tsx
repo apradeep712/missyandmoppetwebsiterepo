@@ -217,8 +217,7 @@ export default function AboutPage() {
           </motion.div>
         </div>
       </section>
-
-      {/* =========================================
+     {/* =========================================
           4. FOOTER CTA
       ========================================= */}
       <section className="py-40 px-6 text-center bg-[#E0F7FA] text-[#4A4238] rounded-t-[4rem] relative overflow-hidden">
