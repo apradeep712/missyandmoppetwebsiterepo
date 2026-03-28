@@ -6,9 +6,9 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
 
-  // Use the Environment Variable from your .env.local
-  // In Codespaces, this must be the ...-3000.app.github.dev URL
-  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || requestUrl.origin
+  // Clean the Base URL to avoid double slashes (e.g., //account)
+  const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || requestUrl.origin
+  const SITE_URL = rawSiteUrl.replace(/\/$/, '')
 
   if (code) {
     const cookieStore = await cookies()
@@ -31,14 +31,15 @@ export async function GET(request: Request) {
       }
     )
 
+    // Exchange the temporary code for a permanent user session
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     
     if (!error) {
-      // SUCCESS: Redirect to the account page using the Env Var
+      // SUCCESS: Using the cleaned SITE_URL to go to /account
       return NextResponse.redirect(`${SITE_URL}/account`)
     }
   }
 
-  // FAILURE: Redirect to auth page with an error parameter
+  // FAILURE: Back to auth with an error message
   return NextResponse.redirect(`${SITE_URL}/auth?error=auth-code-error`)
 }
