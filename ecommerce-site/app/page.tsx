@@ -13,6 +13,8 @@ import SocialStrip from './components/home/SocialStrip';
 import AboutSection from './components/home/AboutSection';  
 import NewsletterSection from './components/home/NewsletterSection';  
 import HomeSubscriptionTrySection from './components/home/HomeSubscriptionTrySection';
+import AccessoriesSection from './components/home/AccessoriesSection';
+
   
 import ScrollReveal from '@/app/components/ScrollReveal';
   
@@ -83,12 +85,12 @@ export default async function Home() {
             </section>  
           </ScrollReveal>
   
-          {/* Subscription / Try-at-home promo */}  
-          <ScrollReveal delay={140}>  
-            <section className="rounded-[32px] border border-[#ead8cd]/70 bg-white/80 px-5 py-9 shadow-[0_22px_60px_rgba(0,0,0,0.16)] backdrop-blur-xl">  
-              <HomeSubscriptionTrySection />  
-            </section>  
-          </ScrollReveal>
+          {/* Accessories card */}
+<ScrollReveal delay={140}>
+  <section className="rounded-[32px] border border-[#ead8cd]/70 bg-white/80 px-5 py-9 shadow-[0_22px_60px_rgba(0,0,0,0.16)] backdrop-blur-xl">
+    <AccessoriesSection />
+  </section>
+</ScrollReveal>
   
           {/* Craft / how it's made */}  
           <ScrollReveal delay={160}>  

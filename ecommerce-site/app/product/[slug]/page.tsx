@@ -87,7 +87,8 @@ export default async function ProductPage(props: { params: Promise<{ slug: strin
 
             <div className="pt-10 border-t border-[#EAD8CD]/60">
               <div className="grid grid-cols-3 gap-4">
-                {['Pure Cotton', 'Try-at-Home', 'Artisan Made'].map((text) => (
+{['Pure Cotton', 'Handcrafted', 'WhatsApp Support'].map((text) => (
+
                   <div key={text} className="text-center">
                     <p className="text-[9px] font-black uppercase tracking-widest text-[#A07D68]">{text}</p>
                   </div>
