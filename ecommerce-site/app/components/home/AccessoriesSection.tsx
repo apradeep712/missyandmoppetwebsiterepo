@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 
 export default function AccessoriesSection() {
@@ -27,11 +28,15 @@ export default function AccessoriesSection() {
         </div>
       </div>
 
-      <div className="rounded-[28px] bg-[#f6e4d8] p-6 text-center">
-        <div className="flex min-h-[180px] items-center justify-center rounded-[24px] border border-white/60 bg-white/50 px-6">
-          <p className="text-lg font-medium text-[#6a5045]">
-            Tiny details, beautifully made.
-          </p>
+      <div className="overflow-hidden rounded-[28px] bg-[#f6e4d8] p-3">
+        <div className="relative min-h-[260px] overflow-hidden rounded-[24px] md:min-h-[340px]">
+          <Image
+            src="/sub/subsa.png"
+            alt="Handcrafted baby accessories"
+            fill
+            sizes="(max-width: 768px) 100vw, 40vw"
+            className="object-cover"
+          />
         </div>
       </div>
     </div>
