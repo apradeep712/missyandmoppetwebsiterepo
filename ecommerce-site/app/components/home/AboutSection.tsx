@@ -23,7 +23,7 @@ export default function AboutSection() {
     
     <img 
       src="/about/aboutheader.png" 
-      alt="Missy & Mopet Studio" 
+      alt="Missy & Moppet Studio" 
       className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
     />
 
@@ -52,13 +52,13 @@ export default function AboutSection() {
           transition={{ duration: 0.45, ease: 'easeOut', delay: 0.05 }}  
         >  
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">  
-            About Missy &amp; Mopet  
+            About Missy &amp; Moppet  
           </p>  
           <h2 className="text-2xl font-semibold text-amber-900 sm:text-3xl">  
             A kidswear brand that started with one tiny wardrobe.  
           </h2>  
           <p className="text-sm text-stone-700">  
-            Missy &amp; Mopet was born when a parent couldn&apos;t find clothes  
+            Missy &amp; Moppet was born when a parent couldn&apos;t find clothes  
             that were soft enough for baby skin and sweet enough for everyday  
             photos. So we started designing pieces that feel like a hug, in  
             colours that look dreamy on every child.  
