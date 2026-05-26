@@ -22,18 +22,40 @@ interface CheckoutInput {
   }>;
 }
 
-function assertPincode(pincode: string) {  
-  if (!/^\d{6}$/.test(pincode)) throw new Error("Invalid pincode");  
+function assertPincode(pincode: string) {
+  // Allow 4-10 digits for international zip/postal codes
+  if (!/^\d{4,10}$/.test(pincode)) throw new Error("Invalid pincode/zip code");
 }
 
-export async function POST(req: Request) {  
+export async function POST(req: Request) {
   try {
     const input = (await req.json()) as CheckoutInput;
 
     assertPincode(input.shipping_address.pincode);
 
-    if (!input.items?.length) {  
-      return NextResponse.json({ error: "No items" }, { status: 400 });  
+    if (!input.items?.length) {
+      return NextResponse.json({ error: "No items" }, { status: 400 });
+    }
+
+    // --- Idempotency Check ---
+    const idempotencyKey = req.headers.get("x-idempotency-key");
+    if (idempotencyKey) {
+      const { data: existingOrder } = await supabaseAdmin
+        .from("orders")
+        .select("id, razorpay_order_id, total_amount_cents, currency")
+        .eq("idempotency_key", idempotencyKey)
+        .single();
+
+      if (existingOrder) {
+        console.log("Returning existing order for idempotency key:", idempotencyKey);
+        return NextResponse.json({
+          order_id: existingOrder.id,
+          razorpay_order_id: existingOrder.razorpay_order_id,
+          amount_cents: existingOrder.total_amount_cents,
+          currency: existingOrder.currency || "INR",
+          razorpay_key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "placeholder",
+        });
+      }
     }
 
     // --- Step 1: Fetch products from DB ---
@@ -58,60 +80,75 @@ export async function POST(req: Request) {
     }
 
     // --- Step 2: Create DB order ---
-    const { data: orderRow, error: orderErr } = await supabaseAdmin  
-      .from("orders")  
-      .insert({  
-        customer_name: input.customer_name,  
-        customer_email: input.customer_email, 
-        customer_phone: input.customer_phone, 
-        shipping_line1: input.shipping_address.line1,  
-        shipping_city: input.shipping_address.city,  
-        shipping_state: input.shipping_address.state,  
+    const { data: orderRow, error: orderErr } = await supabaseAdmin
+      .from("orders")
+      .insert({
+        customer_name: input.customer_name,
+        customer_email: input.customer_email,
+        customer_phone: input.customer_phone,
+        shipping_line1: input.shipping_address.line1,
+        shipping_city: input.shipping_address.city,
+        shipping_state: input.shipping_address.state,
         shipping_pincode: input.shipping_address.pincode,
         shipping_address: input.shipping_address,
-        currency: "INR",  
+        currency: "INR",
         total_amount_cents: totalAmountCents,
-        payment_status: "created",  
-        fulfillment_status: "pending",  
-      })  
-      .select("*")  
+        payment_status: "created",
+        fulfillment_status: "pending",
+        idempotency_key: idempotencyKey || null,
+      })
+      .select("*")
       .single();
 
     if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 500 });
 
     // --- Step 3: Insert order items ---
-    const itemsToInsert = input.items.map((it) => {  
-      const p = byId.get(it.product_id)!;  
-      return {  
-        order_id: orderRow.id,  
-        product_id: p.id,  
-        quantity: it.qty,  
-        selected_age_months: it.selected_age_months,  
-        price_cents: p.price_cents,  
-      };  
+    const itemsToInsert = input.items.map((it) => {
+      const p = byId.get(it.product_id)!;
+      return {
+        order_id: orderRow.id,
+        product_id: p.id,
+        quantity: it.qty,
+        selected_age_months: it.selected_age_months,
+        price_cents: p.price_cents,
+      };
     });
 
     const { error: itemsErr } = await supabaseAdmin.from("order_items").insert(itemsToInsert);  
     if (itemsErr) return NextResponse.json({ error: itemsErr.message }, { status: 500 });
 
     // --- Step 4: Razorpay Order (with Mock Fallback) ---
+    const provider = process.env.PAYMENTS_PROVIDER || "mock";
     let rpOrderId = "";
-    if (!process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID === "placeholder") {
-       rpOrderId = `order_FAKE_${Date.now()}`;
+
+    if (provider === "mock") {
+      rpOrderId = `order_FAKE_${Date.now()}`;
     } else {
-       const razorpay = getRazorpayClient();  
-       const rpOrder = await razorpay.orders.create({  
-         amount: totalAmountCents, 
-         currency: "INR",  
-         receipt: `order_${orderRow.id}`,  
-       });
-       rpOrderId = rpOrder.id;
+      const razorpay = getRazorpayClient();
+      const rpOrder = await razorpay.orders.create({
+        amount: totalAmountCents,
+        currency: "INR",
+        receipt: `order_${orderRow.id}`,
+      });
+      rpOrderId = rpOrder.id;
     }
 
-    await supabaseAdmin  
-      .from("orders")  
-      .update({ razorpay_order_id: rpOrderId })  
+    await supabaseAdmin
+      .from("orders")
+      .update({ razorpay_order_id: rpOrderId })
       .eq("id", orderRow.id);
+
+    // --- Step 4b: Log payment attempt to razorpay_payments table ---
+    try {
+      await supabaseAdmin.from("razorpay_payments").insert({
+        order_id: orderRow.id,
+        razorpay_order_id: rpOrderId,
+        status: "created",
+      });
+    } catch (paymentLogErr) {
+      console.error("Failed to log payment attempt:", paymentLogErr);
+      // Don't fail the order creation if logging fails
+    }
 
     // --- Step 5: Trigger Admin Email Notification (NEW) ---
     try {

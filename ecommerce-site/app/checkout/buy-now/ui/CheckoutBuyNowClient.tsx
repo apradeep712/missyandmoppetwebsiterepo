@@ -33,6 +33,7 @@ export default function CheckoutBuyNowClient({ productId, qty, ageMonths }: Prop
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [paymentMode, setPaymentMode] = useState<'manual' | 'razorpay' | null>(null);
 
   // New Country State
   const [country, setCountry] = useState(COUNTRIES[0]);
@@ -45,52 +46,97 @@ export default function CheckoutBuyNowClient({ productId, qty, ageMonths }: Prop
     const isPhoneValid = phone.length >= 8; // International numbers vary
     const isPincodeValid = pincode.length >= 4;
     const finalState = country.name === "India" ? selectedState : manualState;
-    
+
     return productId && qty >= 1 && isPhoneValid && isPincodeValid && finalState !== "";
   }, [productId, qty, phone, pincode, selectedState, manualState, country]);
 
-  async function onSubmit(form: HTMLFormElement) {
+  // Helper: Build payload from form
+  const buildPayload = (form: HTMLFormElement) => {
+    const fd = new FormData(form);
+    const finalState = country.name === "India" ? selectedState : manualState;
+
+    return {
+      customer_name: String(fd.get('name') || ''),
+      customer_email: String(fd.get('email') || ''),
+      customer_phone: `${country.code}${phone}`,
+      shipping_address: {
+        line1: String(fd.get('line1') || ''),
+        city: String(fd.get('city') || ''),
+        state: finalState,
+        pincode: pincode,
+        country: country.name,
+      },
+      items: [{ product_id: productId, qty, selected_age_months: ageMonths }],
+    };
+  };
+
+  // Helper: Create order via API
+  const createOrder = async (payload: any) => {
+    const res = await fetch('/api/checkout/create-order', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || 'Failed to create order');
+    return data;
+  };
+
+  // Manual order flow (no payment)
+  const handleManualOrder = async (form: HTMLFormElement) => {
     if (!isValid) {
       setErr("Please ensure all fields are filled correctly.");
       return;
     }
+
     setErr(null);
+    setPaymentMode('manual');
     setLoading(true);
 
     try {
-      const fd = new FormData(form);
-      const finalState = country.name === "India" ? selectedState : manualState;
+      const payload = buildPayload(form);
+      const data = await createOrder(payload);
 
-      const payload = {
-        customer_name: String(fd.get('name') || ''),
-        customer_email: String(fd.get('email') || ''),
-        customer_phone: `${country.code}${phone}`, // Prefixes code
-        shipping_address: {
-          line1: String(fd.get('line1') || ''),
-          city: String(fd.get('city') || ''),
-          state: finalState,
-          pincode: pincode,
-          country: country.name, // Explicitly pass country
-        },
-        items: [{ product_id: productId, qty, selected_age_months: ageMonths }],
-      };
+      // Redirect to success page immediately (no payment)
+      router.push(`/order/success?orderId=${data.order_id}`);
+    } catch (e: any) {
+      setErr(e?.message || 'Something went wrong');
+      setLoading(false);
+      setPaymentMode(null);
+    }
+  };
 
-      const res = await fetch('/api/checkout/create-order', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+  // Payment flow (Razorpay)
+  const handlePaymentOrder = async (form: HTMLFormElement) => {
+    if (!isValid) {
+      setErr("Please ensure all fields are filled correctly.");
+      return;
+    }
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || 'Failed to create order');
+    setErr(null);
+    setPaymentMode('razorpay');
+    setLoading(true);
 
-      const { order_id: internalOrderId, razorpay_order_id: razorpayOrderId, razorpay_key_id: razorpayKeyId, amount_cents: amount, currency = 'INR' } = data;
+    try {
+      const payload = buildPayload(form);
+      const data = await createOrder(payload);
 
+      const {
+        order_id: internalOrderId,
+        razorpay_order_id: razorpayOrderId,
+        razorpay_key_id: razorpayKeyId,
+        amount_cents: amount,
+        currency = 'INR'
+      } = data;
+
+      // Check if mock mode
       if (razorpayOrderId.includes('FAKE')) {
         router.push(`/order/success?orderId=${internalOrderId}`);
         return;
       }
 
+      // Open Razorpay modal
       if (!window.Razorpay) throw new Error('Razorpay script not loaded');
 
       const rzp = new window.Razorpay({
@@ -124,18 +170,19 @@ export default function CheckoutBuyNowClient({ productId, qty, ageMonths }: Prop
       });
 
       rzp.open();
+      setLoading(false);
     } catch (e: any) {
       setErr(e?.message || 'Something went wrong');
-    } finally {
       setLoading(false);
+      setPaymentMode(null);
     }
-  }
+  };
 
   return (
     <>
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
 
-      <form className="mx-auto max-w-xl space-y-6 pb-12" onSubmit={(e) => { e.preventDefault(); onSubmit(e.currentTarget); }}>
+      <form className="mx-auto max-w-xl space-y-6 pb-12" onSubmit={(e) => e.preventDefault()}>
         <div className="overflow-hidden rounded-3xl border border-[#ead8cd] bg-white shadow-sm">
           <div className="bg-[#fdf7f2] px-6 py-4 border-b border-[#ead8cd]">
             <h2 className="text-xs font-bold uppercase tracking-widest text-[#4b3b33]">Delivery Details</h2>
@@ -249,13 +296,67 @@ export default function CheckoutBuyNowClient({ productId, qty, ageMonths }: Prop
           </div>
         )}
 
-        <button 
-          type="submit" 
-          disabled={loading || !isValid} 
-          className="w-full rounded-2xl bg-[#4b3b33] py-4 text-sm font-bold text-white transition-all hover:bg-[#3a2e29] active:scale-[0.99] disabled:opacity-50 disabled:grayscale"
-        >
-          {loading ? 'Processing...' : 'Complete Purchase'}
-        </button>
+        {/* Dual Button Layout */}
+        <div className="space-y-3">
+          {/* Primary Action - Pay Now with Razorpay */}
+          <button
+            type="button"
+            onClick={(e) => {
+              const form = e.currentTarget.closest('form');
+              if (form) handlePaymentOrder(form);
+            }}
+            disabled={loading || !isValid}
+            className="w-full rounded-2xl bg-[#4b3b33] py-4 text-sm font-bold text-white transition-all hover:bg-[#3a2e29] active:scale-[0.99] disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2"
+          >
+            {loading && paymentMode === 'razorpay' ? (
+              'Processing Payment...'
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+                Complete Payment Now
+              </>
+            )}
+          </button>
+
+          {/* Divider with "OR" */}
+          <div className="relative flex items-center justify-center py-2">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-[#ead8cd]"></div>
+            </div>
+            <div className="relative px-4 bg-[#fdf7f2]">
+              <span className="text-xs text-[#a07d68] font-medium">OR</span>
+            </div>
+          </div>
+
+          {/* Secondary Action - Manual Order */}
+          <button
+            type="button"
+            onClick={(e) => {
+              const form = e.currentTarget.closest('form');
+              if (form) handleManualOrder(form);
+            }}
+            disabled={loading || !isValid}
+            className="w-full rounded-2xl bg-white border-2 border-[#4b3b33] py-3 text-sm font-bold text-[#4b3b33] transition-all hover:bg-[#fdf7f2] active:scale-[0.99] disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2"
+          >
+            {loading && paymentMode === 'manual' ? (
+              'Processing...'
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Complete Purchase
+              </>
+            )}
+          </button>
+
+          {/* Helper text */}
+          <p className="text-center text-xs text-[#a07d68] mt-2">
+            Pay now for instant confirmation, or place order for manual payment
+          </p>
+        </div>
       </form>
 
       <style jsx>{`
