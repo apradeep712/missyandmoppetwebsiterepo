@@ -1,10 +1,9 @@
 import { cookies } from 'next/headers';  
 import { createServerClient } from '@supabase/auth-helpers-nextjs';
   
-// Put admin emails here (yours + later client's)  
-const ADMIN_EMAILS = [  
-  'atishpradeep@gmail.com', // TODO: replace with yours  
-  // 'founder@example.com',  
+// Put admin emails here (keep lowercase — compared against the lowercased user email)
+const ADMIN_EMAILS = [
+  'missyandmoppet@gmail.com',
 ];
   
 export async function isAdminRequest(): Promise<boolean> {  

@@ -39,7 +39,7 @@ export async function POST(req: Request) {
   // 3) Load order_items + products for name/price/product_code  
   const { data: items, error: itemsErr } = await supabaseAdmin  
     .from("order_items")  
-    .select("product_id, qty, selected_age_months, unit_price_cents")  
+    .select("product_id, quantity, selected_age_months, price_cents")
     .eq("order_id", order_id);
   
   if (itemsErr) return NextResponse.json({ error: itemsErr.message }, { status: 500 });  
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
     return {  
       name: `${p.name} (${it.selected_age_months} months)`,  
       sku: `${baseSku}-${it.selected_age_months}M`,  
-      units: Number(it.qty),  
+      units: Number(it.quantity),
       selling_price,  
       discount: 0,  
       tax: 0,  

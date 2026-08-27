@@ -11,6 +11,48 @@ export default function AdminOrdersPage() {
 
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  // Per-order confirmation-email state: idle | sending | sent | error
+  const [confirmState, setConfirmState] = useState<Record<string, 'idle' | 'sending' | 'sent' | 'error'>>({});
+  // Per-order "mark payment received" state: idle | saving | error
+  const [payState, setPayState] = useState<Record<string, 'idle' | 'saving' | 'error'>>({});
+
+  async function markPaymentReceived(orderId: string) {
+    setPayState((s) => ({ ...s, [orderId]: 'saving' }));
+    try {
+      const res = await fetch('/api/admin/mark-payment-received', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ order_id: orderId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Failed to update');
+      // Flip the pill to "paid" locally without a full refetch.
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, payment_status: 'paid' } : o))
+      );
+      setPayState((s) => ({ ...s, [orderId]: 'idle' }));
+    } catch (err) {
+      console.error('Mark payment received failed:', err);
+      setPayState((s) => ({ ...s, [orderId]: 'error' }));
+    }
+  }
+
+  async function sendConfirmation(orderId: string) {
+    setConfirmState((s) => ({ ...s, [orderId]: 'sending' }));
+    try {
+      const res = await fetch('/api/admin/send-order-confirmation', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ order_id: orderId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Failed to send');
+      setConfirmState((s) => ({ ...s, [orderId]: 'sent' }));
+    } catch (err) {
+      console.error('Send confirmation failed:', err);
+      setConfirmState((s) => ({ ...s, [orderId]: 'error' }));
+    }
+  }
 
   useEffect(() => {
     async function fetchOrders() {
@@ -49,11 +91,12 @@ export default function AdminOrdersPage() {
               <th className="px-6 py-4">Items</th>
               <th className="px-6 py-4">Total</th>
               <th className="px-6 py-4">Status</th>
+              <th className="px-6 py-4">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#fdf7f2]">
             {loading ? (
-              <tr><td colSpan={5} className="p-10 text-center animate-pulse">Loading orders...</td></tr>
+              <tr><td colSpan={6} className="p-10 text-center animate-pulse">Loading orders...</td></tr>
             ) : orders.map((order) => (
               <tr key={order.id} className="text-sm text-[#7c675b] hover:bg-[#fdf7f2]/50 transition-colors">
                 <td className="px-6 py-4">
@@ -78,6 +121,64 @@ export default function AdminOrdersPage() {
                   }`}>
                     {order.payment_status}
                   </span>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Mark payment received */}
+                    {(() => {
+                      const isPaid = order.payment_status === 'paid';
+                      const state = payState[order.id] || 'idle';
+                      const saving = state === 'saving';
+                      if (isPaid) {
+                        return (
+                          <span className="px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border bg-green-100 text-green-700 border-green-200">
+                            Paid ✓
+                          </span>
+                        );
+                      }
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => markPaymentReceived(order.id)}
+                          disabled={saving}
+                          className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+                            state === 'error'
+                              ? 'bg-red-100 text-red-700 border-red-200'
+                              : 'bg-white text-[#4b3b33] border-[#4b3b33] hover:bg-[#fdf7f2]'
+                          }`}
+                        >
+                          {saving ? 'Saving…' : state === 'error' ? 'Retry' : 'Mark payment received'}
+                        </button>
+                      );
+                    })()}
+
+                    {/* Send confirmation email (separate action) */}
+                    {(() => {
+                      const state = confirmState[order.id] || 'idle';
+                      const sending = state === 'sending';
+                      const label =
+                        state === 'sending' ? 'Sending…'
+                        : state === 'sent' ? 'Sent ✓'
+                        : state === 'error' ? 'Retry'
+                        : 'Send confirmation';
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => sendConfirmation(order.id)}
+                          disabled={sending}
+                          className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+                            state === 'sent'
+                              ? 'bg-green-100 text-green-700 border-green-200'
+                              : state === 'error'
+                              ? 'bg-red-100 text-red-700 border-red-200'
+                              : 'bg-[#4b3b33] text-[#fdf7f2] border-[#4b3b33] hover:opacity-90'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })()}
+                  </div>
                 </td>
               </tr>
             ))}

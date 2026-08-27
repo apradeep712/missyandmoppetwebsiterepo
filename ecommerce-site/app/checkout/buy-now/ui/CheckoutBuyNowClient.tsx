@@ -35,6 +35,12 @@ export default function CheckoutBuyNowClient({ productId, qty, ageMonths }: Prop
   const [err, setErr] = useState<string | null>(null);
   const [paymentMode, setPaymentMode] = useState<'manual' | 'razorpay' | null>(null);
 
+  // Online payment (Razorpay) is only offered once real keys are configured.
+  // In mock mode the key is "placeholder", so we show a single "Place Order" button.
+  const razorpayEnabled =
+    !!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID &&
+    process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID !== 'placeholder';
+
   // New Country State
   const [country, setCountry] = useState(COUNTRIES[0]);
   const [phone, setPhone] = useState('');
@@ -147,19 +153,34 @@ export default function CheckoutBuyNowClient({ productId, qty, ageMonths }: Prop
         name: 'Missy & Moppet',
         description: 'Quality clothing for little ones',
         handler: async (response: any) => {
-          const vr = await fetch('/api/checkout/verify-payment', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({
-              order_id: internalOrderId,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            }),
-          });
+          // NOTE: this runs after the outer try/catch has returned, so it must
+          // handle its own errors — otherwise a verification failure becomes an
+          // unhandled rejection and the paid customer sees nothing.
+          try {
+            const vr = await fetch('/api/checkout/verify-payment', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                order_id: internalOrderId,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
 
-          if (!vr.ok) throw new Error('Payment verification failed');
-          router.push(`/order/success?orderId=${internalOrderId}`);
+            if (!vr.ok) {
+              const d = await vr.json().catch(() => ({}));
+              throw new Error(d?.error || 'Payment verification failed');
+            }
+            router.push(`/order/success?orderId=${internalOrderId}`);
+          } catch (err: any) {
+            setErr(
+              err?.message ||
+                'We could not verify your payment. If money was deducted, please contact us at missyandmoppet@gmail.com with your order details.'
+            );
+            setPaymentMode(null);
+            setLoading(false);
+          }
         },
         prefill: {
           name: payload.customer_name,
@@ -296,41 +317,48 @@ export default function CheckoutBuyNowClient({ productId, qty, ageMonths }: Prop
           </div>
         )}
 
-        {/* Dual Button Layout */}
+        {/* Checkout actions.
+            Online payment appears only when Razorpay is configured; otherwise a
+            single "Place Order" button is shown (payment collected manually). */}
         <div className="space-y-3">
-          {/* Primary Action - Pay Now with Razorpay */}
-          <button
-            type="button"
-            onClick={(e) => {
-              const form = e.currentTarget.closest('form');
-              if (form) handlePaymentOrder(form);
-            }}
-            disabled={loading || !isValid}
-            className="w-full rounded-2xl bg-[#4b3b33] py-4 text-sm font-bold text-white transition-all hover:bg-[#3a2e29] active:scale-[0.99] disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2"
-          >
-            {loading && paymentMode === 'razorpay' ? (
-              'Processing Payment...'
-            ) : (
-              <>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                </svg>
-                Complete Payment Now
-              </>
-            )}
-          </button>
+          {/* Online payment (Razorpay) — only when live */}
+          {razorpayEnabled && (
+            <>
+              <button
+                type="button"
+                onClick={(e) => {
+                  const form = e.currentTarget.closest('form');
+                  if (form) handlePaymentOrder(form);
+                }}
+                disabled={loading || !isValid}
+                className="w-full rounded-2xl bg-[#4b3b33] py-4 text-sm font-bold text-white transition-all hover:bg-[#3a2e29] active:scale-[0.99] disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2"
+              >
+                {loading && paymentMode === 'razorpay' ? (
+                  'Processing Payment...'
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                    Complete Payment Now
+                  </>
+                )}
+              </button>
 
-          {/* Divider with "OR" */}
-          <div className="relative flex items-center justify-center py-2">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-[#ead8cd]"></div>
-            </div>
-            <div className="relative px-4 bg-[#fdf7f2]">
-              <span className="text-xs text-[#a07d68] font-medium">OR</span>
-            </div>
-          </div>
+              {/* Divider with "OR" */}
+              <div className="relative flex items-center justify-center py-2">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-[#ead8cd]"></div>
+                </div>
+                <div className="relative px-4 bg-[#fdf7f2]">
+                  <span className="text-xs text-[#a07d68] font-medium">OR</span>
+                </div>
+              </div>
+            </>
+          )}
 
-          {/* Secondary Action - Manual Order */}
+          {/* Place order (payment collected manually). Becomes the primary,
+              filled button when it is the only option. */}
           <button
             type="button"
             onClick={(e) => {
@@ -338,7 +366,11 @@ export default function CheckoutBuyNowClient({ productId, qty, ageMonths }: Prop
               if (form) handleManualOrder(form);
             }}
             disabled={loading || !isValid}
-            className="w-full rounded-2xl bg-white border-2 border-[#4b3b33] py-3 text-sm font-bold text-[#4b3b33] transition-all hover:bg-[#fdf7f2] active:scale-[0.99] disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2"
+            className={
+              razorpayEnabled
+                ? 'w-full rounded-2xl bg-white border-2 border-[#4b3b33] py-3 text-sm font-bold text-[#4b3b33] transition-all hover:bg-[#fdf7f2] active:scale-[0.99] disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2'
+                : 'w-full rounded-2xl bg-[#4b3b33] py-4 text-sm font-bold text-white transition-all hover:bg-[#3a2e29] active:scale-[0.99] disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-2'
+            }
           >
             {loading && paymentMode === 'manual' ? (
               'Processing...'
@@ -347,14 +379,16 @@ export default function CheckoutBuyNowClient({ productId, qty, ageMonths }: Prop
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                Complete Purchase
+                {razorpayEnabled ? 'Complete Purchase' : 'Place Order'}
               </>
             )}
           </button>
 
           {/* Helper text */}
           <p className="text-center text-xs text-[#a07d68] mt-2">
-            Pay now for instant confirmation, or place order for manual payment
+            {razorpayEnabled
+              ? 'Pay now for instant confirmation, or place order for manual payment'
+              : "Place your order and we'll confirm your payment details shortly."}
           </p>
         </div>
       </form>

@@ -60,7 +60,10 @@ function AdminLinks({ mobile = false }: { mobile?: boolean }) {
       </Link>  
       <Link href="/admin/requests" className={baseClasses}>
         {mobile && <span className="text-lg">💌</span>} Requests
-      </Link>  
+      </Link>
+      <Link href="/admin/surveys" className={baseClasses}>
+        {mobile && <span className="text-lg">📝</span>} Surveys
+      </Link>
       {!mobile && (
         <Link href="/" className="mt-4 block rounded-full px-3 py-1.5 text-xs text-[#7c675b] hover:bg-[#fdf2e9]">
           ← Back to site

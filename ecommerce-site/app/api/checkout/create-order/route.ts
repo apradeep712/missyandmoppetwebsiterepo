@@ -165,7 +165,7 @@ export async function POST(req: Request) {
 
       await resend.emails.send({
         from: 'Missy & Moppet Orders <onboarding@resend.dev>',
-        to: ['atishpradeep@gmail.com'],
+        to: ['missyandmoppet@gmail.com'],
         subject: `New Manual Order: ${input.customer_name}`,
         html: `
           <div style="font-family: sans-serif; color: #4b3b33; max-width: 600px;">
