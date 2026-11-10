@@ -1,9 +1,11 @@
-// app/about/page.tsx
+// app/newborn-kit/page.tsx
 'use client';
 
 import Link from 'next/link';
-import React from 'react';
-import { motion, easeOut } from 'framer-motion';
+import Image from 'next/image';
+import React, { useEffect, useState } from 'react';
+import { motion, AnimatePresence, easeOut } from 'framer-motion';
+import { X } from 'lucide-react';
 import NewbornKitInterestedButtonClient from '../components/NewbornKitInterestedButtonClient';
 
 const fadeIn = {
@@ -13,7 +15,38 @@ const fadeIn = {
   transition: { duration: 0.8, ease: easeOut }
 };
 
-export default function AboutPage() {
+type KitItem = {
+  src: string;
+  name: string;
+  note: string;
+  qty?: string;
+};
+
+const KIT_ITEMS: KitItem[] = [
+  { src: '/newborn/kit-quilted-blanket.png', name: 'Quilted Blanket', note: 'Soft diamond-quilted cotton for the first cuddle.' },
+  { src: '/newborn/kit-muslin-swaddle.png', name: 'Muslin Swaddle', note: 'Breathable, airy layers that drape gently.' },
+  { src: '/newborn/kit-muslin-swaddle-roll.png', name: 'Swaddle Wrap', note: 'Rolled and ready for a snug, secure wrap.' },
+  { src: '/newborn/kit-kimono-bodysuit.png', name: 'Kimono Bodysuit', note: 'Wrap-front design, no pulling over tiny heads.' },
+  { src: '/newborn/kit-zip-sleepsuit.png', name: 'Zip Sleepsuit', note: 'Easy two-way zip for quick night changes.' },
+  { src: '/newborn/kit-caps.png', name: 'Ribbed Caps', note: 'Keeps little heads warm in the first days.', qty: '×2' },
+  { src: '/newborn/kit-mittens.png', name: 'Scratch Mittens', note: 'Gentle cuffs that protect delicate skin.', qty: '×2 pairs' },
+  { src: '/newborn/kit-booties.png', name: 'Booties', note: 'Ribbed cuffs that stay on tiny feet.', qty: '×2 pairs' },
+  { src: '/newborn/kit-washcloths.png', name: 'Muslin Washcloths', note: 'Printed, absorbent and soft for daily care.', qty: '×2' },
+  { src: '/newborn/kit-bear-rattle.png', name: 'Crochet Bear Rattle', note: 'Hand-crocheted friend on a wooden ring.' },
+];
+
+export default function NewbornKitPage() {
+  const [active, setActive] = useState<KitItem | null>(null);
+
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setActive(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [active]);
+
   return (
     <main className="min-h-screen bg-[#fdf7f2] text-[#4b3b33] selection:bg-[#f3d8c3]">
       {/* Top bar */}
@@ -80,14 +113,27 @@ export default function AboutPage() {
             transition={{ duration: 1 }}
             className="relative"
           >
-            <div className="aspect-[4/5] overflow-hidden rounded-[4rem] shadow-2xl">
-              <img 
-                src="/newborn/item-detail.jpg" 
-                 
-                alt="The Missy & Moppet Hospital Kit"
-                className="h-full w-full object-cover transform hover:scale-105 transition-transform duration-700"
+            <div className="relative aspect-[4/5] overflow-hidden rounded-[4rem] shadow-2xl">
+              <Image
+                src="/newborn/kit-full.png"
+                alt="The complete Missy & Moppet Newborn Kit with its quilted keepsake bag"
+                fill
+                priority
+                sizes="(min-width: 1024px) 50vw, 100vw"
+                className="object-cover transform hover:scale-105 transition-transform duration-700"
               />
             </div>
+            {/* Floating badge */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6, duration: 0.6 }}
+              className="absolute -bottom-5 right-6 sm:right-10 rounded-full border border-[#ead8cd] bg-white/90 px-5 py-3 shadow-lg backdrop-blur-md"
+            >
+              <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-[#a07d68]">
+                10 essentials · 1 keepsake bag
+              </span>
+            </motion.div>
             {/* Decorative Element */}
             <div className="absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-[#f3d8c3]/30 blur-3xl" />
           </motion.div>
@@ -152,17 +198,87 @@ export default function AboutPage() {
           <h2 className="text-4xl font-semibold">Everything they need, thoughtfully packed.</h2>
         </div>
         
-        <motion.div {...fadeIn} className="mx-auto max-w-5xl">
-          {/* IMAGE 3: Kit Includes Illustration */}
-          <div className="rounded-[3rem] overflow-hidden shadow-xl bg-white p-4">
-             <img 
-                src="/newborn/mainkit.jpg" 
-                alt="Detailed view of kit items"
-                className="w-full rounded-[2.5rem]"
-              />
-          </div>
-        </motion.div>
+        {/* Item grid */}
+        <div className="mx-auto max-w-7xl grid grid-cols-2 gap-4 sm:gap-6 md:grid-cols-3 lg:grid-cols-5">
+          {KIT_ITEMS.map((item, i) => (
+            <motion.button
+              key={item.src}
+              type="button"
+              onClick={() => setActive(item)}
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-40px' }}
+              transition={{ duration: 0.6, delay: (i % 5) * 0.08, ease: easeOut }}
+              className="group text-left rounded-[2rem] bg-white p-2.5 shadow-sm ring-1 ring-[#ead8cd]/60 transition-shadow hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#a07d68]"
+              aria-label={`View ${item.name}`}
+            >
+              <div className="relative aspect-[3/4] overflow-hidden rounded-[1.6rem] bg-[#f9efe7]">
+                <Image
+                  src={item.src}
+                  alt={item.name}
+                  fill
+                  sizes="(min-width: 1024px) 20vw, (min-width: 768px) 33vw, 50vw"
+                  className="object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+                {item.qty && (
+                  <span className="absolute top-3 right-3 rounded-full bg-white/90 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-[#a07d68] shadow-sm backdrop-blur">
+                    {item.qty}
+                  </span>
+                )}
+              </div>
+              <div className="px-2 pt-4 pb-3">
+                <h4 className="font-serif italic text-lg leading-snug text-[#4b3b33]">{item.name}</h4>
+                <p className="mt-1 text-xs leading-relaxed text-[#7c675b]">{item.note}</p>
+              </div>
+            </motion.button>
+          ))}
+        </div>
       </section>
+
+      {/* Lightbox */}
+      <AnimatePresence>
+        {active && (
+          <motion.div
+            key="lightbox"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setActive(null)}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-[#3f2f28]/80 p-4 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-label={active.name}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 10 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 10 }}
+              transition={{ duration: 0.3, ease: easeOut }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative w-full max-w-lg overflow-hidden rounded-[2.5rem] bg-white shadow-2xl"
+            >
+              <div className="relative aspect-[3/4] w-full max-h-[70vh]">
+                <Image src={active.src} alt={active.name} fill sizes="(min-width: 640px) 512px, 100vw" className="object-cover" />
+              </div>
+              <div className="px-6 py-5">
+                <h4 className="font-serif italic text-2xl text-[#4b3b33]">
+                  {active.name}
+                  {active.qty && <span className="ml-2 text-sm not-italic font-sans text-[#a07d68]">{active.qty}</span>}
+                </h4>
+                <p className="mt-1 text-sm text-[#7c675b]">{active.note}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActive(null)}
+                className="absolute top-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-[#4b3b33] shadow-md hover:bg-white"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* --- BRAND STORY: IMAGE 4 & 2 --- */}
       <section className="px-6 py-32">

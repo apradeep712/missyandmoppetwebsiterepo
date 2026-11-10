@@ -1,6 +1,7 @@
 'use client';
   
-import Link from 'next/link';  
+import Link from 'next/link';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
   
 export default function NewbornKitTeaser() {  
@@ -54,7 +55,7 @@ export default function NewbornKitTeaser() {
           transition={{ duration: 0.45, ease: 'easeOut', delay: 0.1 }}  
         >  
           <motion.div  
-            className="relative mx-auto h-[320px] w-full max-w-md overflow-hidden rounded-[2rem] bg-gradient-to-br from-rose-100 to-pink-50 shadow-[0_26px_70px_rgba(15,23,42,0.4)]"  
+            className="relative mx-auto aspect-[4/5] w-full max-w-md overflow-hidden rounded-[2rem] bg-gradient-to-br from-rose-100 to-pink-50 shadow-[0_26px_70px_rgba(15,23,42,0.4)]"  
             whileHover={{ scale: 1.02 }}  
             transition={{ duration: 0.25 }}  
           >  
@@ -63,12 +64,13 @@ export default function NewbornKitTeaser() {
   
             <div className="relative z-10 flex h-full items-center justify-center px-6 text-center text-sm text-rose-700">  
               <div className="absolute inset-0">  
-        {/* eslint-disable-next-line @next/next/no-img-element */}  
-        <img  
-          src="/newborn/mainkit.jpg" // put your real image path here  
-          alt="Customize Missy & Mopet outfit"  
-          className="h-full w-full object-cover"  
-        />  
+        <Image
+          src="/newborn/kit-full.png"
+          alt="The complete Missy & Moppet Newborn Kit with its quilted keepsake bag"
+          fill
+          sizes="(min-width: 1024px) 448px, 100vw"
+          className="object-cover"
+        />
       </div>
             </div>  
           </motion.div>  
