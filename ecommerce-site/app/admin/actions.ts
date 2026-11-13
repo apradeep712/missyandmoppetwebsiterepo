@@ -33,6 +33,11 @@ export async function upsertProduct(productData: any) {
 export async function deleteProduct(id: string) {
   await assertAdmin();
   const { error } = await supabaseAdmin.from('products').delete().eq('id', id);
+  if (error?.code === '23503') {
+    throw new Error(
+      "This product can't be deleted because customers have already ordered it, and it's kept for order history. To remove it from the shop, untick \"Make live on website\" instead."
+    );
+  }
   if (error) throw error;
   revalidatePath('/admin/products');
 }

@@ -547,8 +547,14 @@ export default function AdminProductsPage() {
 
     const { error } = await supabase.from('products').delete().eq('id', p.id);
 
-    if (error) setErrorMsg(error.message);
-    else setProducts((prev) => prev.filter((x) => x.id !== p.id));
+    if (error) {
+      // 23503 = still referenced by order_items (customers have ordered it)
+      setErrorMsg(
+        error.code === '23503'
+          ? `"${p.name}" can't be deleted because customers have already ordered it, and it's kept for order history. To remove it from the shop, click Edit, untick "Make live on website" and save. It will then show as Hidden.`
+          : error.message
+      );
+    } else setProducts((prev) => prev.filter((x) => x.id !== p.id));
   }
 
   return (
