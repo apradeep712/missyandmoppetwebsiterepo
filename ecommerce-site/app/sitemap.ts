@@ -10,7 +10,6 @@ const routes = [
   '/about',
   '/newborn-kit',
   '/customize',
-  '/subscription',
   '/try-at-home',
   '/survey',
   '/contact',

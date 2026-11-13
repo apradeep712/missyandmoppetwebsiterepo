@@ -1,111 +1,78 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { hmacSha256Hex } from "@/lib/crypto";
-export const runtime = "nodejs";
-export async function POST(req: Request) {
-  const body = await req.json() as {
-    order_id: string; // your DB order id
-    razorpay_order_id: string;
-    razorpay_payment_id: string;
-    razorpay_signature: string;
-  };
+import { hmacSha256Hex, safeEqual } from "@/lib/crypto";
+import { isRazorpayLive, markOrderPaid, markOrderPaymentFailed } from "@/lib/orderPayment";
 
-  // Load order and verify it matches
-  const { data: order, error } = await supabaseAdmin
+export const runtime = "nodejs";
+
+type VerifyBody = {
+  order_id?: string; // our DB order id
+  razorpay_order_id?: string;
+  razorpay_payment_id?: string;
+  razorpay_signature?: string;
+  failed?: boolean; // client reports a failed attempt (Razorpay "payment.failed")
+  reason?: string;
+};
+
+export async function POST(req: Request) {
+  if (!isRazorpayLive()) {
+    return NextResponse.json({ error: "Online payments are not enabled" }, { status: 400 });
+  }
+
+  const body = (await req.json().catch(() => ({}))) as VerifyBody;
+  if (!body.order_id || !body.razorpay_order_id) {
+    return NextResponse.json({ error: "Missing payment details" }, { status: 400 });
+  }
+
+  const { data: order } = await supabaseAdmin
     .from("orders")
     .select("id, razorpay_order_id, payment_status")
     .eq("id", body.order_id)
-    .single();
+    .maybeSingle();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
-
-  if (order.razorpay_order_id !== body.razorpay_order_id) {
-    return NextResponse.json({ error: "Razorpay order mismatch" }, { status: 400 });
+  if (!order.razorpay_order_id || order.razorpay_order_id !== body.razorpay_order_id) {
+    return NextResponse.json({ error: "Payment does not match this order" }, { status: 400 });
   }
 
-  // Verify signature: sha256(order_id|payment_id)
-  const payload = `${body.razorpay_order_id}|${body.razorpay_payment_id}`;
-  const expected = hmacSha256Hex(process.env.RAZORPAY_KEY_SECRET!, payload);
-
-  if (expected !== body.razorpay_signature) {
-    // Log failed verification attempt
-    try {
-      await supabaseAdmin.from("razorpay_payments").insert({
-        order_id: body.order_id,
-        razorpay_order_id: body.razorpay_order_id,
-        razorpay_payment_id: body.razorpay_payment_id,
-        razorpay_signature: body.razorpay_signature,
-        status: "failed",
-      });
-
-      // Update order status to failed
-      await supabaseAdmin
-        .from("orders")
-        .update({ payment_status: "failed" })
-        .eq("id", body.order_id);
-    } catch (logErr) {
-      console.error("Failed to log payment failure:", logErr);
-    }
-
-    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+  // Client-reported failure: record it (never downgrades a paid order).
+  if (body.failed) {
+    await markOrderPaymentFailed({
+      orderId: order.id,
+      razorpayOrderId: body.razorpay_order_id,
+      razorpayPaymentId: body.razorpay_payment_id ?? null,
+      reason: body.reason?.slice(0, 300) ?? "payment failed",
+    });
+    return NextResponse.json({ ok: false, payment_status: order.payment_status === "paid" ? "paid" : "failed" });
   }
 
-  // Mark paid (idempotent)
-  let wasJustPaid = false;
-  if (order.payment_status !== "paid") {
-    const { error: updErr } = await supabaseAdmin
-      .from("orders")
-      .update({
-        payment_status: "paid",
-        razorpay_payment_id: body.razorpay_payment_id,
-        razorpay_signature: body.razorpay_signature,
-      })
-      .eq("id", order.id);
-
-    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
-    wasJustPaid = true;
-
-    // Log successful verification
-    try {
-      await supabaseAdmin.from("razorpay_payments").insert({
-        order_id: body.order_id,
-        razorpay_order_id: body.razorpay_order_id,
-        razorpay_payment_id: body.razorpay_payment_id,
-        razorpay_signature: body.razorpay_signature,
-        status: "verified",
-      });
-    } catch (logErr) {
-      console.error("Failed to log successful payment:", logErr);
-      // Don't fail the payment if logging fails
-    }
+  if (!body.razorpay_payment_id || !body.razorpay_signature) {
+    return NextResponse.json({ error: "Missing payment details" }, { status: 400 });
   }
 
-  // Trigger shipment creation automatically after successful payment
-  // Only trigger if we just marked it paid (idempotency - avoid duplicate shipments)
-  if (wasJustPaid && process.env.SHIPROCKET_EMAIL) {
-    try {
-      // Call shipment creation API internally
-      const shipmentRes = await fetch(
-        `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/shiprocket/create-shipment`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ order_id: order.id }),
-        }
-      );
-
-      if (!shipmentRes.ok) {
-        const shipErr = await shipmentRes.json().catch(() => ({}));
-        console.error('Shipment creation failed:', shipErr);
-        // Don't fail the payment verification if shipping fails
-        // Admin can manually create shipment later
-      }
-    } catch (shipErr) {
-      console.error('Error triggering shipment creation:', shipErr);
-      // Don't fail the payment verification if shipping fails
-    }
+  // Razorpay signature = HMAC_SHA256(order_id + "|" + payment_id, key_secret)
+  const expected = hmacSha256Hex(
+    process.env.RAZORPAY_KEY_SECRET!,
+    `${body.razorpay_order_id}|${body.razorpay_payment_id}`
+  );
+  if (!safeEqual(expected, body.razorpay_signature)) {
+    // Don't change the order: a bad/forged signature says nothing about the real payment.
+    console.warn("Invalid Razorpay signature for order", order.id);
+    return NextResponse.json({ error: "Payment could not be verified" }, { status: 400 });
   }
 
-  return NextResponse.json({ ok: true });
-}  
+  try {
+    await markOrderPaid({
+      orderId: order.id,
+      razorpayOrderId: body.razorpay_order_id,
+      razorpayPaymentId: body.razorpay_payment_id,
+      razorpaySignature: body.razorpay_signature,
+      source: "verify",
+    });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json({ error: "Payment received but could not be saved. We'll confirm it shortly." }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, payment_status: "paid" });
+}

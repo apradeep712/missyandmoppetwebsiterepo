@@ -5,6 +5,17 @@ Resend). **No application code, config, or dependencies were changed by this sca
 documentation-only report. Findings are grounded in the actual code with `file:line`
 references so they can be acted on later.
 
+> **Status update (2026-11-10, payments go-live hardening).** Fixed in code:
+> **C1** (admin server actions now require the admin session), **C3** (PIN is checked on the
+> server and sets an httpOnly signed cookie; set `ADMIN_PIN` + `ADMIN_SESSION_SECRET`),
+> **H1** (webhook checks the paid amount; client verify is bound to the server-created
+> Razorpay order), **H3** (send-confirmation, mark-paid and book-shipment require the admin
+> session; the public `/api/shiprocket/create-shipment` route was removed), **M1** (email
+> HTML is escaped), **M2** (checkout routes return generic errors), **M4** (stock, active
+> flag, size and quantity 1–10 are validated). Line numbers below refer to the old code.
+> **Still open:** C2 (RLS off — other admin pages still read with the anon key), H2
+> (upload endpoint), H4 (rate limiting), M3 (security headers), L1–L4.
+
 ---
 
 ## Accepted by design — NOT a finding

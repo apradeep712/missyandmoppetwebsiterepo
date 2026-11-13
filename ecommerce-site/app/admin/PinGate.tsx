@@ -1,32 +1,50 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 
 export default function PinGate({ children }: { children: React.ReactNode }) {
   const [pin, setPin] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // null = checking the existing session cookie
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [error, setError] = useState(false);
+  const [checking, setChecking] = useState(false);
 
-  // Pulling from env for security
-  const VALID_PIN = process.env.NEXT_PUBLIC_ADMIN_PIN;
-
+  // The PIN is checked on the server, which sets an httpOnly session cookie.
+  // Admin API routes (mark paid, book shipment, send email) require that cookie.
   useEffect(() => {
-    const auth = sessionStorage.getItem('admin_auth');
-    if (auth === 'true') setIsAuthenticated(true);
+    fetch('/api/admin/login')
+      .then((r) => r.json())
+      .then((d) => setIsAuthenticated(!!d.ok))
+      .catch(() => setIsAuthenticated(false));
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pin === VALID_PIN) {
-      sessionStorage.setItem('admin_auth', 'true');
-      setIsAuthenticated(true);
-      setError(false);
-    } else {
+    setChecking(true);
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ pin }),
+      });
+      if (res.ok) {
+        setIsAuthenticated(true);
+        setError(false);
+      } else {
+        setError(true);
+        setPin('');
+      }
+    } catch {
       setError(true);
-      setPin('');
-      // Shake effect or feedback could be added here
+    } finally {
+      setChecking(false);
     }
   };
+
+  if (isAuthenticated === null) {
+    return <div className="min-h-screen bg-[#fdf7f2]" />;
+  }
 
   if (!isAuthenticated) {
     return (
@@ -71,6 +89,7 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
 
               <button
                 type="submit"
+                disabled={checking || !pin}
                 className="w-full rounded-2xl bg-[#4b3b33] py-4 text-xs font-bold uppercase tracking-[0.2em] text-white shadow-lg shadow-stone-300 transition-all hover:bg-[#3d3029] active:scale-[0.98]"
               >
                 Verify & Enter
@@ -80,9 +99,9 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
 
           {/* Footer link */}
           <div className="text-center mt-8">
-            <a href="/" className="text-[10px] font-bold uppercase tracking-widest text-[#b8927c] hover:text-[#4b3b33] transition-colors">
+            <Link href="/" className="text-[10px] font-bold uppercase tracking-widest text-[#b8927c] hover:text-[#4b3b33] transition-colors">
               ← Return to storefront
-            </a>
+            </Link>
           </div>
         </div>
       </div>

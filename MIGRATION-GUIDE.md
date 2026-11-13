@@ -187,35 +187,54 @@ account owner's own inbox — **real customer emails will not arrive** until a d
 
 ---
 
-## 5. Razorpay (payments) — only when going live
+## 5. Razorpay (payments)
 
-The site currently runs in **mock mode** (`PAYMENTS_PROVIDER` unset/`mock`, keys are
-`placeholder`), so no real money moves. To accept real payments:
-1. Client completes Razorpay KYC at https://razorpay.com (needs business PAN, bank account,
-   and the legal/policy pages — Terms, Privacy, Refund, Shipping, Contact — which already exist
-   on the site).
-2. From Razorpay Dashboard → Settings → API Keys, get **Key ID** and **Key Secret**.
-3. Set env vars: `PAYMENTS_PROVIDER=razorpay`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`,
-   `NEXT_PUBLIC_RAZORPAY_KEY_ID` (the same Key ID, exposed to the browser).
-4. Create a **webhook** (Razorpay → Settings → Webhooks) pointing to
-   `https://<site>/api/webhooks/razorpay`, subscribe to payment events, and set the signing
-   secret as `RAZORPAY_WEBHOOK_SECRET`.
-5. **Before going live**, note the security follow-up in `SECURITY-NOTES.md`: the payment
-   verification does not yet check the paid amount equals the order total. Address that first.
+**How checkout works now:** customers choose **Pay online** (Razorpay: UPI, cards, net banking,
+wallets) or **Cash on Delivery**. *Pay online* only appears when real Razorpay keys are set;
+otherwise the site offers COD only. An online order counts as paid only after Razorpay confirms
+it (browser check + webhook backup). The result page shows the real status (paid / COD / failed
+/ awaiting payment).
 
-> If the client prefers to keep the current **manual** flow (admin marks "payment received"
-> and sends confirmation), they can skip Razorpay entirely and stay in mock mode — the admin
-> Orders page supports it.
+Tested end to end in Razorpay **test mode** on 2026-11-10: real checkout window, test bank
+success and failure, signature checks, webhook (including duplicate and out-of-order events).
+
+To go live:
+1. Client completes Razorpay KYC at https://razorpay.com (business PAN, bank account, GST if
+   registered; the policy pages Terms, Privacy, Refund, Shipping and Contact already exist).
+2. Razorpay Dashboard → **Account & Settings → Payment capture**: keep **automatic capture ON**.
+3. Dashboard → **API Keys** (Live mode) → generate **Key ID** and **Key Secret**.
+4. In Vercel → Environment Variables (Production), set:
+   `PAYMENTS_PROVIDER=razorpay`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`. Then redeploy.
+   (`NEXT_PUBLIC_RAZORPAY_KEY_ID` is no longer needed; the server tells the browser the key.)
+5. Dashboard → **Webhooks → Add**: URL `https://<site>/api/webhooks/razorpay`, events
+   **payment.captured** and **payment.failed**, and a secret of your choice. Put the same secret in
+   `RAZORPAY_WEBHOOK_SECRET` and redeploy.
+6. Place one small real order and refund it from the Razorpay dashboard.
 
 ---
 
-## 6. Shiprocket (shipping) — only when going live
+## 6. Shiprocket (shipping) and COD
 
-Currently mock (empty credentials). To enable real labels/AWB:
-1. Client creates a Shiprocket account at https://shiprocket.in and a **pickup location**.
-2. Set env vars: `SHIP_PROVIDER=shiprocket`, `SHIPROCKET_EMAIL`, `SHIPROCKET_PASSWORD`,
-   `SHIPROCKET_PICKUP_LOCATION` (the exact pickup nickname from their dashboard).
-3. Note: Shiprocket is India-only; the shipment payload assumes India + numeric pincodes.
+- **Paid online orders:** the shipment is booked automatically once payment is confirmed
+  (create order → assign courier/AWB → request pickup).
+- **COD orders:** never booked automatically. Admin → Orders shows *Call to confirm, then book*;
+  after phoning the customer, click **Book shipment**. Once the cash is collected, click
+  **Mark payment received**.
+- Failed bookings show *Retry* in Admin → Orders. A retry never creates a duplicate Shiprocket
+  order.
+
+To enable:
+1. Client creates a Shiprocket account at https://shiprocket.in, completes KYC, adds a
+   **pickup address**, recharges the wallet and enables COD if wanted.
+2. Set in Vercel: `SHIPROCKET_EMAIL`, `SHIPROCKET_PASSWORD` (best: a separate API user from
+   Shiprocket → Settings → API → Configure), and `SHIPROCKET_PICKUP_LOCATION` (the pickup
+   nickname, exactly as in Shiprocket). Shipping turns on when all three are set.
+   (`SHIP_PROVIDER` is no longer used.)
+3. Optional parcel defaults: `SHIPROCKET_DEFAULT_WEIGHT_KG` (0.5),
+   `SHIPROCKET_DEFAULT_LENGTH_CM` (25), `SHIPROCKET_DEFAULT_BREADTH_CM` (20),
+   `SHIPROCKET_DEFAULT_HEIGHT_CM` (5).
+4. Book one real test shipment from Admin → Orders, then cancel it in Shiprocket before pickup.
+5. Shiprocket is India-only; checkout accepts only Indian 10-digit mobiles and 6-digit pincodes.
 
 ---
 
@@ -242,24 +261,26 @@ SUPABASE_URL=                        # same value
 NEXT_PUBLIC_SUPABASE_ANON_KEY=       # Supabase → Settings → API → anon public
 SUPABASE_SERVICE_ROLE_KEY=           # Supabase → Settings → API → service_role (SECRET)
 
-# Admin
-NEXT_PUBLIC_ADMIN_PIN=               # choose a new PIN for the client
+# Admin (checked on the server; never NEXT_PUBLIC_)
+ADMIN_PIN=                           # choose a new PIN for the client
+ADMIN_SESSION_SECRET=                # long random string (e.g. `openssl rand -hex 32`)
+# NEXT_PUBLIC_ADMIN_PIN can be deleted once ADMIN_PIN is set
 
 # Email
 RESEND_API_KEY=                      # Resend → API Keys
+EMAIL_FROM="Missy & Moppet <orders@<client-domain>>"   # after the domain is verified in Resend
+ADMIN_ORDER_EMAIL=missyandmoppet@gmail.com              # where new-order alerts go
 
 # Site
 NEXT_PUBLIC_SITE_URL=https://<client-domain>
 
-# Payments (leave as-is for mock; fill only when going live)
-PAYMENTS_PROVIDER=mock
-NEXT_PUBLIC_RAZORPAY_KEY_ID=placeholder
-RAZORPAY_KEY_ID=placeholder
-RAZORPAY_KEY_SECRET=placeholder
-# RAZORPAY_WEBHOOK_SECRET=
+# Payments: COD-only until these are set
+PAYMENTS_PROVIDER=razorpay           # or mock = COD only
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+RAZORPAY_WEBHOOK_SECRET=
 
-# Shipping (leave empty for mock)
-SHIP_PROVIDER=mock
+# Shipping: auto-booking is on when all three are set
 SHIPROCKET_EMAIL=
 SHIPROCKET_PASSWORD=
 SHIPROCKET_PICKUP_LOCATION=

@@ -27,7 +27,7 @@ export default function PrivacyPage() {
       <H2>2. How we use your information</H2>
       <UL>
         <li>To process and deliver your orders and send order-related communication.</li>
-        <li>To respond to enquiries, custom requests, try-at-home and subscription interest.</li>
+        <li>To respond to enquiries, custom requests, and try-at-home requests.</li>
         <li>To improve our products and the Site, and (where you consent) to send marketing updates.</li>
         <li>To comply with legal and regulatory obligations.</li>
       </UL>

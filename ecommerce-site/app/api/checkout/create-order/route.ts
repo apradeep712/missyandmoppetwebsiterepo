@@ -1,19 +1,24 @@
-import { NextResponse } from "next/server";  
-import { supabaseAdmin } from "@/lib/supabaseAdmin";  
-import { getRazorpayClient } from "@/lib/razorpay";  
-import { Resend } from 'resend'; // 1. Added Resend import
+import { NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { getRazorpayClient } from "@/lib/razorpay";
+import { isRazorpayLive, runAfterOrderPlaced } from "@/lib/orderPayment";
+import { orderViewToken } from "@/lib/crypto";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+export const runtime = "nodejs";
+
+const MAX_QTY_PER_LINE = 10;
 
 interface CheckoutInput {
   customer_name: string;
   customer_email: string;
   customer_phone: string;
+  payment_method?: "razorpay" | "cod";
   shipping_address: {
     line1: string;
     city: string;
     state: string;
     pincode: string;
+    country?: string;
   };
   items: Array<{
     product_id: string;
@@ -22,197 +27,214 @@ interface CheckoutInput {
   }>;
 }
 
-function assertPincode(pincode: string) {
-  // Allow 4-10 digits for international zip/postal codes
-  if (!/^\d{4,10}$/.test(pincode)) throw new Error("Invalid pincode/zip code");
+class BadRequest extends Error {}
+
+function str(v: unknown, field: string, max = 200) {
+  const s = typeof v === "string" ? v.trim() : "";
+  if (!s) throw new BadRequest(`${field} is required`);
+  if (s.length > max) throw new BadRequest(`${field} is too long`);
+  return s;
+}
+
+function validate(input: CheckoutInput) {
+  if (!input || typeof input !== "object") throw new BadRequest("Invalid request");
+  const name = str(input.customer_name, "Name", 100);
+  const email = str(input.customer_email, "Email", 200);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new BadRequest("Please enter a valid email");
+
+  const digits = String(input.customer_phone ?? "").replace(/\D/g, "");
+  const phone10 = digits.length === 12 && digits.startsWith("91") ? digits.slice(2) : digits;
+  if (!/^[6-9]\d{9}$/.test(phone10)) throw new BadRequest("Please enter a valid 10-digit Indian mobile number");
+
+  const a = input.shipping_address ?? ({} as CheckoutInput["shipping_address"]);
+  if (a.country && a.country !== "India") throw new BadRequest("We currently ship only within India");
+  const address = {
+    line1: str(a.line1, "Address", 300),
+    city: str(a.city, "City", 100),
+    state: str(a.state, "State", 100),
+    pincode: str(a.pincode, "Pincode", 6),
+  };
+  if (!/^[1-9]\d{5}$/.test(address.pincode)) throw new BadRequest("Please enter a valid 6-digit pincode");
+
+  const method = input.payment_method ?? "razorpay";
+  if (method !== "razorpay" && method !== "cod") throw new BadRequest("Invalid payment method");
+
+  if (!Array.isArray(input.items) || !input.items.length) throw new BadRequest("Your cart is empty");
+  if (input.items.length > 30) throw new BadRequest("Too many items");
+  const items = input.items.map((it) => {
+    const qty = Number(it?.qty);
+    if (!Number.isInteger(qty) || qty < 1 || qty > MAX_QTY_PER_LINE) {
+      throw new BadRequest(`Quantity must be between 1 and ${MAX_QTY_PER_LINE}`);
+    }
+    if (typeof it.product_id !== "string" || !it.product_id) throw new BadRequest("Invalid product");
+    const age = it.selected_age_months == null ? null : Number(it.selected_age_months);
+    if (age !== null && !Number.isInteger(age)) throw new BadRequest("Invalid size");
+    return { product_id: it.product_id, qty, selected_age_months: age };
+  });
+
+  return { name, email, phone: `+91${phone10}`, address, method, items };
 }
 
 export async function POST(req: Request) {
+  let input: ReturnType<typeof validate>;
   try {
-    const input = (await req.json()) as CheckoutInput;
+    input = validate((await req.json()) as CheckoutInput);
+  } catch (e) {
+    const msg = e instanceof BadRequest ? e.message : "Invalid request";
+    return NextResponse.json({ error: msg }, { status: 400 });
+  }
 
-    assertPincode(input.shipping_address.pincode);
+  const live = isRazorpayLive();
+  if (input.method === "razorpay" && !live) {
+    return NextResponse.json({ error: "Online payment is not available right now. Please choose Cash on Delivery." }, { status: 400 });
+  }
 
-    if (!input.items?.length) {
-      return NextResponse.json({ error: "No items" }, { status: 400 });
-    }
-
-    // --- Idempotency Check ---
-    const idempotencyKey = req.headers.get("x-idempotency-key");
-    if (idempotencyKey) {
-      const { data: existingOrder } = await supabaseAdmin
-        .from("orders")
-        .select("id, razorpay_order_id, total_amount_cents, currency")
-        .eq("idempotency_key", idempotencyKey)
-        .single();
-
-      if (existingOrder) {
-        console.log("Returning existing order for idempotency key:", idempotencyKey);
-        return NextResponse.json({
-          order_id: existingOrder.id,
-          razorpay_order_id: existingOrder.razorpay_order_id,
-          amount_cents: existingOrder.total_amount_cents,
-          currency: existingOrder.currency || "INR",
-          razorpay_key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "placeholder",
-        });
-      }
-    }
-
-    // --- Step 1: Fetch products from DB ---
-    const productIds = input.items.map((i) => i.product_id);  
-    const { data: products, error: prodErr } = await supabaseAdmin  
-      .from("products")  
-      .select("id,name,price_cents,currency,product_code,is_active,stock")  
-      .in("id", productIds);
-
-    if (prodErr) return NextResponse.json({ error: prodErr.message }, { status: 500 });  
-    if (!products || products.length !== productIds.length) {  
-      return NextResponse.json({ error: "One or more products not found" }, { status: 400 });  
-    }
-
-    const byId = new Map(products.map((p) => [p.id, p]));  
-    let totalAmountCents = 0;
-
-    for (const it of input.items) {  
-      const p = byId.get(it.product_id);  
-      if (!p) return NextResponse.json({ error: "Product missing" }, { status: 400 });  
-      totalAmountCents += Number(p.price_cents) * Number(it.qty);  
-    }
-
-    // --- Step 2: Create DB order ---
-    const { data: orderRow, error: orderErr } = await supabaseAdmin
+  // --- Idempotency (optional header from the client) ---
+  const idempotencyKey = req.headers.get("x-idempotency-key")?.slice(0, 100) || null;
+  if (idempotencyKey) {
+    const { data: existing } = await supabaseAdmin
       .from("orders")
-      .insert({
-        customer_name: input.customer_name,
-        customer_email: input.customer_email,
-        customer_phone: input.customer_phone,
-        shipping_line1: input.shipping_address.line1,
-        shipping_city: input.shipping_address.city,
-        shipping_state: input.shipping_address.state,
-        shipping_pincode: input.shipping_address.pincode,
-        shipping_address: input.shipping_address,
+      .select("id, razorpay_order_id, total_amount_cents, payment_status")
+      .eq("idempotency_key", idempotencyKey)
+      .maybeSingle();
+    if (existing && existing.payment_status !== "failed") {
+      return NextResponse.json({
+        order_id: existing.id,
+        view_token: orderViewToken(existing.id),
+        payment_method: existing.payment_status === "cod" ? "cod" : "razorpay",
+        razorpay_order_id: existing.razorpay_order_id,
+        amount_cents: existing.total_amount_cents,
         currency: "INR",
-        total_amount_cents: totalAmountCents,
-        payment_status: "created",
-        fulfillment_status: "pending",
-        idempotency_key: idempotencyKey || null,
-      })
-      .select("*")
-      .single();
-
-    if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 500 });
-
-    // --- Step 3: Insert order items ---
-    const itemsToInsert = input.items.map((it) => {
-      const p = byId.get(it.product_id)!;
-      return {
-        order_id: orderRow.id,
-        product_id: p.id,
-        quantity: it.qty,
-        selected_age_months: it.selected_age_months,
-        price_cents: p.price_cents,
-      };
-    });
-
-    const { error: itemsErr } = await supabaseAdmin.from("order_items").insert(itemsToInsert);  
-    if (itemsErr) return NextResponse.json({ error: itemsErr.message }, { status: 500 });
-
-    // --- Step 4: Razorpay Order (with Mock Fallback) ---
-    const provider = process.env.PAYMENTS_PROVIDER || "mock";
-    let rpOrderId = "";
-
-    if (provider === "mock") {
-      rpOrderId = `order_FAKE_${Date.now()}`;
-    } else {
-      const razorpay = getRazorpayClient();
-      const rpOrder = await razorpay.orders.create({
-        amount: totalAmountCents,
-        currency: "INR",
-        receipt: `order_${orderRow.id}`,
+        razorpay_key_id: process.env.RAZORPAY_KEY_ID,
       });
-      rpOrderId = rpOrder.id;
     }
+  }
 
+  // --- Products: price/availability always come from the DB, never the browser ---
+  const productIds = [...new Set(input.items.map((i) => i.product_id))];
+  const { data: products, error: prodErr } = await supabaseAdmin
+    .from("products")
+    .select("id,name,price_cents,currency,is_active,stock,age_months")
+    .in("id", productIds);
+
+  if (prodErr) {
+    console.error("Product lookup failed:", prodErr);
+    return NextResponse.json({ error: "Could not load products. Please try again." }, { status: 500 });
+  }
+  const byId = new Map((products ?? []).map((p) => [p.id, p]));
+
+  let totalAmountCents = 0;
+  const qtyByProduct = new Map<string, number>();
+  for (const it of input.items) {
+    const p = byId.get(it.product_id);
+    if (!p) return NextResponse.json({ error: "One of the products is no longer available" }, { status: 400 });
+    if (!p.is_active) return NextResponse.json({ error: `${p.name} is no longer available` }, { status: 400 });
+    if ((p.currency || "INR") !== "INR") return NextResponse.json({ error: "Unsupported currency" }, { status: 400 });
+    const ages: number[] | null = Array.isArray(p.age_months) ? p.age_months : null;
+    if (ages?.length && it.selected_age_months !== null && !ages.includes(it.selected_age_months)) {
+      return NextResponse.json({ error: `Selected size is not available for ${p.name}` }, { status: 400 });
+    }
+    if (ages?.length && it.selected_age_months === null) {
+      return NextResponse.json({ error: `Please choose a size for ${p.name}` }, { status: 400 });
+    }
+    qtyByProduct.set(p.id, (qtyByProduct.get(p.id) ?? 0) + it.qty);
+    totalAmountCents += Number(p.price_cents) * it.qty;
+  }
+  for (const [pid, qty] of qtyByProduct) {
+    const p = byId.get(pid)!;
+    if (typeof p.stock === "number" && p.stock < qty) {
+      return NextResponse.json(
+        { error: p.stock > 0 ? `Only ${p.stock} left of ${p.name}` : `${p.name} is out of stock` },
+        { status: 400 }
+      );
+    }
+  }
+  if (totalAmountCents < 100) return NextResponse.json({ error: "Invalid order total" }, { status: 400 });
+
+  // --- Create DB order ---
+  const { data: orderRow, error: orderErr } = await supabaseAdmin
+    .from("orders")
+    .insert({
+      customer_name: input.name,
+      customer_email: input.email,
+      customer_phone: input.phone,
+      shipping_line1: input.address.line1,
+      shipping_city: input.address.city,
+      shipping_state: input.address.state,
+      shipping_pincode: input.address.pincode,
+      shipping_address: { ...input.address, country: "India" },
+      currency: "INR",
+      total_amount_cents: totalAmountCents,
+      payment_status: input.method === "cod" ? "cod" : "created",
+      fulfillment_status: "pending",
+      idempotency_key: idempotencyKey,
+    })
+    .select("id")
+    .single();
+
+  if (orderErr || !orderRow) {
+    console.error("Order insert failed:", orderErr);
+    return NextResponse.json({ error: "Could not create your order. Please try again." }, { status: 500 });
+  }
+
+  const { error: itemsErr } = await supabaseAdmin.from("order_items").insert(
+    input.items.map((it) => ({
+      order_id: orderRow.id,
+      product_id: it.product_id,
+      quantity: it.qty,
+      selected_age_months: it.selected_age_months,
+      price_cents: byId.get(it.product_id)!.price_cents,
+    }))
+  );
+  if (itemsErr) {
+    console.error("Order items insert failed:", itemsErr);
+    await supabaseAdmin.from("orders").update({ payment_status: "failed", payment_failed_reason: "items insert failed" }).eq("id", orderRow.id);
+    return NextResponse.json({ error: "Could not create your order. Please try again." }, { status: 500 });
+  }
+
+  const base = {
+    order_id: orderRow.id,
+    view_token: orderViewToken(orderRow.id),
+    amount_cents: totalAmountCents,
+    currency: "INR",
+  };
+
+  // --- Cash on Delivery: done. Admin confirms by phone, then books the shipment. ---
+  if (input.method === "cod") {
+    runAfterOrderPlaced(orderRow.id, { autoShip: false });
+    return NextResponse.json({ ...base, payment_method: "cod" });
+  }
+
+  // --- Razorpay order (amount in paise; receipt max 40 chars) ---
+  let rpOrderId: string;
+  try {
+    const rpOrder = await getRazorpayClient().orders.create({
+      amount: totalAmountCents,
+      currency: "INR",
+      receipt: `mm_${orderRow.id.replace(/-/g, "").slice(0, 30)}`,
+      notes: { order_id: orderRow.id },
+    });
+    rpOrderId = rpOrder.id;
+  } catch (e: any) {
+    console.error("Razorpay order create failed:", e?.error ?? e);
     await supabaseAdmin
       .from("orders")
-      .update({ razorpay_order_id: rpOrderId })
+      .update({ payment_status: "failed", payment_failed_reason: "razorpay order create failed" })
       .eq("id", orderRow.id);
-
-    // --- Step 4b: Log payment attempt to razorpay_payments table ---
-    try {
-      await supabaseAdmin.from("razorpay_payments").insert({
-        order_id: orderRow.id,
-        razorpay_order_id: rpOrderId,
-        status: "created",
-      });
-    } catch (paymentLogErr) {
-      console.error("Failed to log payment attempt:", paymentLogErr);
-      // Don't fail the order creation if logging fails
-    }
-
-    // --- Step 5: Trigger Admin Email Notification (NEW) ---
-    try {
-      const productListHtml = products.map(p => {
-        const item = input.items.find(it => it.product_id === p.id);
-        return `
-          <tr>
-            <td style="padding: 8px; border-bottom: 1px solid #eee;">${p.name}</td>
-            <td style="padding: 8px; border-bottom: 1px solid #eee;">${item?.qty}</td>
-            <td style="padding: 8px; border-bottom: 1px solid #eee;">${item?.selected_age_months || 'N/A'} mo</td>
-            <td style="padding: 8px; border-bottom: 1px solid #eee;">₹${p.price_cents / 100}</td>
-          </tr>`;
-      }).join('');
-
-      await resend.emails.send({
-        from: 'Missy & Moppet Orders <onboarding@resend.dev>',
-        to: ['missyandmoppet@gmail.com'],
-        subject: `New Manual Order: ${input.customer_name}`,
-        html: `
-          <div style="font-family: sans-serif; color: #4b3b33; max-width: 600px;">
-            <h2>🚨 New Order Received</h2>
-            <p>A new order has been placed and needs manual processing.</p>
-            
-            <div style="background: #fdf7f2; padding: 20px; border-radius: 15px; border: 1px solid #ead8cd;">
-              <h3 style="margin-top: 0;">Customer Details</h3>
-              <p><strong>Name:</strong> ${input.customer_name}</p>
-              <p><strong>Phone:</strong> ${input.customer_phone}</p>
-              <p><strong>Email:</strong> ${input.customer_email}</p>
-              <p><strong>Address:</strong> ${input.shipping_address.line1}, ${input.shipping_address.city}, ${input.shipping_address.state} - ${input.shipping_address.pincode}</p>
-            </div>
-
-            <h3>Items Ordered</h3>
-            <table style="width: 100%; border-collapse: collapse;">
-              <thead>
-                <tr style="background: #eee; text-align: left;">
-                  <th style="padding: 8px;">Product</th>
-                  <th style="padding: 8px;">Qty</th>
-                  <th style="padding: 8px;">Age</th>
-                  <th style="padding: 8px;">Price</th>
-                </tr>
-              </thead>
-              <tbody>${productListHtml}</tbody>
-            </table>
-            
-            <p style="font-size: 18px; font-weight: bold; margin-top: 20px;">Total Amount: ₹${totalAmountCents / 100}</p>
-            <p style="font-size: 12px; color: #a07d68;">Order ID: ${orderRow.id}</p>
-          </div>
-        `,
-      });
-    } catch (emailErr) {
-      console.error("Failed to send admin email:", emailErr);
-      // We don't return 500 here because the order is already in the DB.
-    }
-
-    return NextResponse.json({  
-      order_id: orderRow.id,  
-      razorpay_order_id: rpOrderId,  
-      amount_cents: totalAmountCents,  
-      currency: "INR",  
-      razorpay_key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "placeholder",  
-    });
-
-  } catch (err: any) {
-    console.error("Checkout Error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: "Payment could not be started. Please try again or choose Cash on Delivery." }, { status: 502 });
   }
+
+  const { error: updErr } = await supabaseAdmin.from("orders").update({ razorpay_order_id: rpOrderId }).eq("id", orderRow.id);
+  if (updErr) {
+    console.error("Saving razorpay_order_id failed:", updErr);
+    return NextResponse.json({ error: "Payment could not be started. Please try again." }, { status: 500 });
+  }
+  await supabaseAdmin.from("razorpay_payments").insert({ order_id: orderRow.id, razorpay_order_id: rpOrderId, status: "created" });
+
+  return NextResponse.json({
+    ...base,
+    payment_method: "razorpay",
+    razorpay_order_id: rpOrderId,
+    razorpay_key_id: process.env.RAZORPAY_KEY_ID,
+  });
 }

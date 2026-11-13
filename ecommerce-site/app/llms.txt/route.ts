@@ -10,13 +10,12 @@ export async function GET() {
 
 > Missy & Moppet is a children's clothing brand offering artistic, minimal, luxury clothing for little ones — from newborns to older kids. We focus on softness, comfort, unique designs, and thoughtful, age-appropriate sizing.
 
-Missy & Moppet is based in India. Alongside the main shop, we offer newborn kits, customizable pieces, a subscription, and a try-at-home service. Orders and shipping are handled within India.
+Missy & Moppet is based in India. Alongside the main shop, we offer newborn kits, customizable pieces, and a try-at-home service. Orders and shipping are handled within India.
 
 ## Shop
 - [Shop all products](${siteUrl}/shop): Browse the full children's clothing catalog.
 - [Newborn Kit](${siteUrl}/newborn-kit): Curated essentials for newborns.
 - [Customize](${siteUrl}/customize): Request custom-made pieces.
-- [Subscription](${siteUrl}/subscription): A recurring box of kids' clothing.
 - [Try at Home](${siteUrl}/try-at-home): Try pieces at home before buying.
 
 ## Company

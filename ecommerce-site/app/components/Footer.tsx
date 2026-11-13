@@ -7,7 +7,6 @@ const SHOP_LINKS = [
   { label: 'Shop', href: '/shop' },
   { label: 'Newborn Kit', href: '/newborn-kit' },
   { label: 'Customize', href: '/customize' },
-  { label: 'Subscription', href: '/subscription' },
   { label: 'Try at Home', href: '/try-at-home' },
 ];
 

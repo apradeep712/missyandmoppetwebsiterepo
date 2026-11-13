@@ -12,11 +12,16 @@ import CraftSection from './components/home/CraftSection';
 import SocialStrip from './components/home/SocialStrip';  
 import AboutSection from './components/home/AboutSection';  
 import NewsletterSection from './components/home/NewsletterSection';  
-import HomeSubscriptionTrySection from './components/home/HomeSubscriptionTrySection';
 import AccessoriesSection from './components/home/AccessoriesSection';
 
   
 import ScrollReveal from '@/app/components/ScrollReveal';
+import type { Metadata } from 'next';
+
+// Tell search engines the homepage is the canonical page for the domain.
+export const metadata: Metadata = {
+  alternates: { canonical: '/' },
+};
   
 type Product = {  
   id: string;  

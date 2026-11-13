@@ -2,6 +2,11 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
+import { isAdminSession } from '@/lib/adminAuth';
+
+async function assertAdmin() {
+  if (!(await isAdminSession())) throw new Error('Unauthorized');
+}
 
 // MASTER CLIENT (Only accessible on the server)
 const supabaseAdmin = createClient(
@@ -11,6 +16,7 @@ const supabaseAdmin = createClient(
 
 /** --- REQUESTS --- **/
 export async function updateRequestStatus(id: string, newStatus: string) {
+  await assertAdmin();
   const { error } = await supabaseAdmin.from('requests').update({ status: newStatus }).eq('id', id);
   if (error) throw error;
   revalidatePath('/admin/requests');
@@ -18,12 +24,14 @@ export async function updateRequestStatus(id: string, newStatus: string) {
 
 /** --- PRODUCTS --- **/
 export async function upsertProduct(productData: any) {
+  await assertAdmin();
   const { error } = await supabaseAdmin.from('products').upsert(productData);
   if (error) throw error;
   revalidatePath('/admin/products');
 }
 
 export async function deleteProduct(id: string) {
+  await assertAdmin();
   const { error } = await supabaseAdmin.from('products').delete().eq('id', id);
   if (error) throw error;
   revalidatePath('/admin/products');
@@ -31,6 +39,7 @@ export async function deleteProduct(id: string) {
 
 /** --- FLYERS --- **/
 export async function upsertFlyer(flyerData: any) {
+  await assertAdmin();
   const { error } = await supabaseAdmin.from('homepage_flyers').upsert(flyerData);
   if (error) throw error;
   revalidatePath('/admin/home');

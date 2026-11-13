@@ -1,193 +1,86 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { hmacSha256Hex } from "@/lib/crypto";
+import { hmacSha256Hex, safeEqual } from "@/lib/crypto";
+import { markOrderPaid, markOrderPaymentFailed } from "@/lib/orderPayment";
 
 export const runtime = "nodejs";
 
 /**
- * Razorpay Webhook Handler
+ * Razorpay webhook — the safety net when the customer closes the window after paying.
  *
- * Handles async payment notifications from Razorpay for scenarios where
- * client-side verification fails (user closes browser, network issues, etc.)
- *
- * Setup: Configure webhook URL in Razorpay Dashboard:
- * https://dashboard.razorpay.com/app/webhooks
- *
- * Events handled:
- * - payment.authorized: Payment successful
- * - payment.failed: Payment failed
- * - payment.captured: Payment captured (for manual capture flows)
+ * Razorpay Dashboard → Settings → Webhooks:
+ *   URL:    https://<site>/api/webhooks/razorpay
+ *   Secret: same value as RAZORPAY_WEBHOOK_SECRET
+ *   Events: payment.captured, payment.failed  (and keep "auto-capture" ON in Payment settings)
  */
 export async function POST(req: Request) {
+  const body = await req.text();
+  const signature = req.headers.get("x-razorpay-signature");
+
+  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  if (!webhookSecret || webhookSecret === "placeholder") {
+    console.error("RAZORPAY_WEBHOOK_SECRET not configured");
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
+  }
+  if (!signature || !safeEqual(hmacSha256Hex(webhookSecret, body), signature)) {
+    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+  }
+
+  let event: any;
   try {
-    const body = await req.text();
-    const signature = req.headers.get("x-razorpay-signature");
+    event = JSON.parse(body);
+  } catch {
+    return NextResponse.json({ error: "Bad payload" }, { status: 400 });
+  }
 
-    if (!signature) {
-      return NextResponse.json({ error: "Missing signature" }, { status: 400 });
-    }
+  const payment = event?.payload?.payment?.entity;
+  if (!payment?.order_id) {
+    // Event we don't handle (or without a payment entity) — acknowledge so Razorpay doesn't retry.
+    return NextResponse.json({ ok: true, ignored: event?.event });
+  }
 
-    // Verify webhook signature
-    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
-    if (!webhookSecret || webhookSecret === "placeholder") {
-      console.error("RAZORPAY_WEBHOOK_SECRET not configured");
-      return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
-    }
+  const { data: order } = await supabaseAdmin
+    .from("orders")
+    .select("id, payment_status, total_amount_cents")
+    .eq("razorpay_order_id", payment.order_id)
+    .maybeSingle();
 
-    const expectedSignature = hmacSha256Hex(webhookSecret, body);
+  if (!order) {
+    console.warn("Webhook: no order for razorpay_order_id", payment.order_id);
+    return NextResponse.json({ ok: true, ignored: "unknown order" });
+  }
 
-    if (expectedSignature !== signature) {
-      console.error("Invalid webhook signature");
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-    }
-
-    // Parse webhook event
-    const event = JSON.parse(body);
-    console.log("Razorpay webhook event:", event.event);
-
-    // Handle different event types
+  try {
     switch (event.event) {
-      case "payment.authorized":
       case "payment.captured":
-        await handlePaymentSuccess(event);
-        break;
-
-      case "payment.failed":
-        await handlePaymentFailure(event);
-        break;
-
-      default:
-        console.log(`Unhandled webhook event: ${event.event}`);
-    }
-
-    return NextResponse.json({ ok: true });
-  } catch (err: any) {
-    console.error("Webhook processing error:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
-  }
-}
-
-async function handlePaymentSuccess(event: any) {
-  const payment = event.payload.payment.entity;
-  const razorpayOrderId = payment.order_id;
-  const razorpayPaymentId = payment.id;
-
-  console.log(`Processing successful payment: ${razorpayPaymentId} for order: ${razorpayOrderId}`);
-
-  // Find order by razorpay_order_id
-  const { data: order, error: orderErr } = await supabaseAdmin
-    .from("orders")
-    .select("id, payment_status")
-    .eq("razorpay_order_id", razorpayOrderId)
-    .single();
-
-  if (orderErr || !order) {
-    console.error("Order not found for razorpay_order_id:", razorpayOrderId);
-    return;
-  }
-
-  // Check if already processed (idempotency)
-  if (order.payment_status === "paid") {
-    console.log("Payment already processed for order:", order.id);
-    return;
-  }
-
-  // Update order status
-  const { error: updateErr } = await supabaseAdmin
-    .from("orders")
-    .update({
-      payment_status: "paid",
-      razorpay_payment_id: razorpayPaymentId,
-    })
-    .eq("id", order.id);
-
-  if (updateErr) {
-    console.error("Failed to update order:", updateErr);
-    throw updateErr;
-  }
-
-  // Log to razorpay_payments table
-  try {
-    await supabaseAdmin.from("razorpay_payments").insert({
-      order_id: order.id,
-      razorpay_order_id: razorpayOrderId,
-      razorpay_payment_id: razorpayPaymentId,
-      status: "verified",
-    });
-  } catch (logErr) {
-    console.error("Failed to log payment:", logErr);
-  }
-
-  // Trigger shipment creation if configured
-  if (process.env.SHIPROCKET_EMAIL) {
-    try {
-      const shipmentRes = await fetch(
-        `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/shiprocket/create-shipment`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ order_id: order.id }),
+      case "payment.authorized":
+      case "order.paid": {
+        if (Number(payment.amount) !== Number(order.total_amount_cents) || (payment.currency && payment.currency !== "INR")) {
+          console.error(`Webhook: amount mismatch for order ${order.id}: paid ${payment.amount} ${payment.currency}, expected ${order.total_amount_cents}`);
+          return NextResponse.json({ ok: true, ignored: "amount mismatch" });
         }
-      );
-
-      if (!shipmentRes.ok) {
-        console.error('Webhook: Shipment creation failed');
-      } else {
-        console.log('Webhook: Shipment created successfully');
+        const { justPaid } = await markOrderPaid({
+          orderId: order.id,
+          razorpayOrderId: payment.order_id,
+          razorpayPaymentId: payment.id,
+          source: "webhook",
+        });
+        return NextResponse.json({ ok: true, justPaid });
       }
-    } catch (shipErr) {
-      console.error('Webhook: Error triggering shipment:', shipErr);
+      case "payment.failed":
+        await markOrderPaymentFailed({
+          orderId: order.id,
+          razorpayOrderId: payment.order_id,
+          razorpayPaymentId: payment.id,
+          reason: [payment.error_code, payment.error_description].filter(Boolean).join(": ") || "payment failed",
+        });
+        return NextResponse.json({ ok: true });
+      default:
+        return NextResponse.json({ ok: true, ignored: event.event });
     }
+  } catch (err) {
+    console.error("Webhook processing error:", err);
+    // 500 → Razorpay retries later, which is what we want for transient DB errors.
+    return NextResponse.json({ error: "Processing failed" }, { status: 500 });
   }
-
-  console.log(`Successfully processed payment for order: ${order.id}`);
-}
-
-async function handlePaymentFailure(event: any) {
-  const payment = event.payload.payment.entity;
-  const razorpayOrderId = payment.order_id;
-  const razorpayPaymentId = payment.id;
-  const errorCode = payment.error_code;
-  const errorDescription = payment.error_description;
-
-  console.log(`Processing failed payment: ${razorpayPaymentId} for order: ${razorpayOrderId}`);
-
-  // Find order by razorpay_order_id
-  const { data: order, error: orderErr } = await supabaseAdmin
-    .from("orders")
-    .select("id, payment_status")
-    .eq("razorpay_order_id", razorpayOrderId)
-    .single();
-
-  if (orderErr || !order) {
-    console.error("Order not found for razorpay_order_id:", razorpayOrderId);
-    return;
-  }
-
-  // Update order status to failed
-  const { error: updateErr } = await supabaseAdmin
-    .from("orders")
-    .update({
-      payment_status: "failed",
-    })
-    .eq("id", order.id);
-
-  if (updateErr) {
-    console.error("Failed to update order:", updateErr);
-    throw updateErr;
-  }
-
-  // Log failed payment
-  try {
-    await supabaseAdmin.from("razorpay_payments").insert({
-      order_id: order.id,
-      razorpay_order_id: razorpayOrderId,
-      razorpay_payment_id: razorpayPaymentId,
-      status: "failed",
-    });
-  } catch (logErr) {
-    console.error("Failed to log payment failure:", logErr);
-  }
-
-  console.log(`Payment failed for order ${order.id}: ${errorCode} - ${errorDescription}`);
 }
