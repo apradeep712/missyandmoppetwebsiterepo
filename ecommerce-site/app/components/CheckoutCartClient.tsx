@@ -57,34 +57,34 @@ export default function CheckoutCartClient() {
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(e.currentTarget); }} className="space-y-4">
       <div className="rounded-[2rem] border border-[#ead8cd] bg-white p-8 space-y-4 shadow-sm">
-        <input name="name" className="w-full rounded-xl border border-[#ead8cd] p-3 text-sm" placeholder="Full Name" required maxLength={100} />
-        <input name="email" type="email" className="w-full rounded-xl border border-[#ead8cd] p-3 text-sm" placeholder="Email" required />
+        <input name="name" className="w-full rounded-xl border border-[#ead8cd] p-3 text-sm text-[#4b3b33] [-webkit-text-fill-color:#4b3b33] placeholder:text-[#b8a497] placeholder:[-webkit-text-fill-color:#b8a497]" placeholder="Full Name" required maxLength={100} />
+        <input name="email" type="email" className="w-full rounded-xl border border-[#ead8cd] p-3 text-sm text-[#4b3b33] [-webkit-text-fill-color:#4b3b33] placeholder:text-[#b8a497] placeholder:[-webkit-text-fill-color:#b8a497]" placeholder="Email" required />
         <div className="flex gap-2">
-          <span className="bg-[#fdf7f2] border border-[#ead8cd] rounded-xl px-4 py-3 text-sm font-bold">+91</span>
+          <span className="bg-[#fdf7f2] border border-[#ead8cd] rounded-xl px-4 py-3 text-sm font-bold text-[#4b3b33]">+91</span>
           <input
             value={phone}
             inputMode="numeric"
             maxLength={10}
             onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-            className="flex-1 rounded-xl border border-[#ead8cd] p-3 text-sm"
+            className="flex-1 rounded-xl border border-[#ead8cd] p-3 text-sm text-[#4b3b33] [-webkit-text-fill-color:#4b3b33] placeholder:text-[#b8a497] placeholder:[-webkit-text-fill-color:#b8a497]"
             placeholder="10-digit mobile number"
             required
           />
         </div>
-        <textarea name="address" className="w-full rounded-xl border border-[#ead8cd] p-3 text-sm" placeholder="Shipping Address" rows={3} required maxLength={300} />
+        <textarea name="address" className="w-full rounded-xl border border-[#ead8cd] p-3 text-sm text-[#4b3b33] [-webkit-text-fill-color:#4b3b33] placeholder:text-[#b8a497] placeholder:[-webkit-text-fill-color:#b8a497]" placeholder="Shipping Address" rows={3} required maxLength={300} />
         <div className="grid grid-cols-2 gap-4">
-          <input name="city" className="w-full rounded-xl border border-[#ead8cd] p-3 text-sm" placeholder="City" required />
+          <input name="city" className="w-full rounded-xl border border-[#ead8cd] p-3 text-sm text-[#4b3b33] [-webkit-text-fill-color:#4b3b33] placeholder:text-[#b8a497] placeholder:[-webkit-text-fill-color:#b8a497]" placeholder="City" required />
           <input
             value={pincode}
             inputMode="numeric"
             maxLength={6}
             onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            className="w-full rounded-xl border border-[#ead8cd] p-3 text-sm"
+            className="w-full rounded-xl border border-[#ead8cd] p-3 text-sm text-[#4b3b33] [-webkit-text-fill-color:#4b3b33] placeholder:text-[#b8a497] placeholder:[-webkit-text-fill-color:#b8a497]"
             placeholder="6-digit Pincode"
             required
           />
         </div>
-        <select value={state} onChange={(e) => setState(e.target.value)} className="w-full rounded-xl border border-[#ead8cd] p-3 text-sm bg-white" required>
+        <select value={state} onChange={(e) => setState(e.target.value)} className="w-full rounded-xl border border-[#ead8cd] p-3 text-sm text-[#4b3b33] [-webkit-text-fill-color:#4b3b33] placeholder:text-[#b8a497] placeholder:[-webkit-text-fill-color:#b8a497] bg-white" required>
           <option value="">Select State</option>
           {INDIAN_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>

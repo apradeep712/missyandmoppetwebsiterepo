@@ -12,7 +12,7 @@ type Props = {
 };
 
 const inputCls =
-  'rounded-xl border border-[#ead8cd] px-4 py-2.5 text-sm outline-none focus:border-[#4b3b33] transition-colors bg-white';
+  'rounded-xl border border-[#ead8cd] px-4 py-2.5 text-sm text-[#4b3b33] [-webkit-text-fill-color:#4b3b33] placeholder:text-[#b8a497] placeholder:[-webkit-text-fill-color:#b8a497] outline-none focus:border-[#4b3b33] transition-colors bg-white';
 
 export default function CheckoutBuyNowClient({ productId, qty, ageMonths }: Props) {
   const { online, busy, error, setError, placeOrder } = useCheckout();
