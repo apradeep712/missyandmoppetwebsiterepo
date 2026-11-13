@@ -135,6 +135,15 @@ function computeAgeMonthsFromTexts(monthPointsText: string, yearPointsText: stri
   return normalizeAgeMonths([...monthPoints, ...yearsToMonths(yearPoints)]);
 }
 
+/** Inverse of computeAgeMonthsFromTexts: whole years (>= 2Y) go to the years box, everything else to months. */
+function textsFromAgeMonths(months: number[]) {
+  const sorted = normalizeAgeMonths(months);
+  return {
+    age_month_points_text: sorted.filter((m) => m < 24 || m % 12 !== 0).join(','),
+    age_year_points_text: sorted.filter((m) => m >= 24 && m % 12 === 0).map((m) => String(m / 12)).join(','),
+  };
+}
+
 function getCollectionLabel(collection: StorefrontCollection | null | undefined) {
   switch (collection) {
     case 'newborn':
@@ -387,13 +396,7 @@ export default function AdminProductsPage() {
 
   function openEditModal(p: Product) {
     const months = normalizeAgeMonths((p.age_months ?? []) as number[]);
-
-    const monthText = months.filter((m) => m < 24).join(',');
-
-    const yearText = months
-      .filter((m) => m >= 24 && m % 12 === 0)
-      .map((m) => String(m / 12))
-      .join(',');
+    const { age_month_points_text: monthText, age_year_points_text: yearText } = textsFromAgeMonths(months);
 
     setModalMode('edit');
 
@@ -457,7 +460,8 @@ export default function AdminProductsPage() {
         throw new Error('Stock must be a non-negative integer.');
       }
 
-      const computedAgeMonths = computeAgeMonthsFromTexts(form.age_month_points_text, form.age_year_points_text);
+      // form.age_months is the single source of truth (quick pick + boundary boxes both write to it)
+      const computedAgeMonths = normalizeAgeMonths(form.age_months);
 
       let imageUrlToSave: string | null = form.image_url.trim() || null;
 
@@ -833,14 +837,14 @@ export default function AdminProductsPage() {
                         key={m}
                         type="button"
                         onClick={() =>
-                          setForm((prev) => ({
-                            ...prev,
-                            age_months: normalizeAgeMonths(
+                          setForm((prev) => {
+                            const next = normalizeAgeMonths(
                               prev.age_months.includes(m)
                                 ? prev.age_months.filter((x) => x !== m)
                                 : [...prev.age_months, m]
-                            ),
-                          }))
+                            );
+                            return { ...prev, age_months: next, ...textsFromAgeMonths(next) };
+                          })
                         }
                         className={cn(
                           'rounded-full border px-3 py-1 text-[11px] font-bold transition',
@@ -856,7 +860,7 @@ export default function AdminProductsPage() {
                 </div>
 
                 <p className="mt-2 text-[11px] text-gray-600">
-                  Quick pick updates <span className="font-mono">age_months</span> directly.
+                  Tap sizes to add or remove them. The boxes below update automatically.
                 </p>
               </div>
 
@@ -873,7 +877,13 @@ export default function AdminProductsPage() {
                       type="text"
                       inputMode="numeric"
                       value={form.age_month_points_text}
-                      onChange={(e) => setForm((prev) => ({ ...prev, age_month_points_text: e.target.value }))}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          age_month_points_text: e.target.value,
+                          age_months: computeAgeMonthsFromTexts(e.target.value, prev.age_year_points_text),
+                        }))
+                      }
                       className="mt-2 w-full rounded-xl border border-[#ead8cd] bg-white p-3 text-sm"
                       placeholder="12,18"
                     />
@@ -888,7 +898,13 @@ export default function AdminProductsPage() {
                       type="text"
                       inputMode="numeric"
                       value={form.age_year_points_text}
-                      onChange={(e) => setForm((prev) => ({ ...prev, age_year_points_text: e.target.value }))}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          age_year_points_text: e.target.value,
+                          age_months: computeAgeMonthsFromTexts(prev.age_month_points_text, e.target.value),
+                        }))
+                      }
                       className="mt-2 w-full rounded-xl border border-[#ead8cd] bg-white p-3 text-sm"
                       placeholder="2,3,4,5,6,7,10,11,13"
                     />
