@@ -29,7 +29,7 @@ export default function HeroSection() {
   
           <div className="space-y-2">  
             <h1 className="text-balance text-5xl font-semibold tracking-tight text-[#4b3b33] sm:text-6xl lg:text-7xl">  
-              Missy &amp; Mopet  
+              Missy &amp; Moppet  
             </h1>  
             <p className="text-balance text-lg font-medium text-[#6b594f] sm:text-xl">  
               Soft, pastel outfits for little explorers.  

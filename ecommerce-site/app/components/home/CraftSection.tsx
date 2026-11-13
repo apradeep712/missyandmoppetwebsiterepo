@@ -69,7 +69,7 @@ export default function CraftSection() {
             Soft on kids, gentle on the planet.  
           </h2>  
           <p className="mt-3 text-sm text-[#7c675b] sm:text-base">  
-            Each Missy &amp; Mopet piece starts with cloud‑soft fabrics, quiet pastels  
+            Each Missy &amp; Moppet piece starts with cloud‑soft fabrics, quiet pastels  
             and tiny details that make dressing easy and light—kind to delicate skin,  
             easy to wash, and designed to be loved, re‑loved and handed down.  
           </p>  
@@ -148,7 +148,7 @@ export default function CraftSection() {
                     </div>
   
                     <div className="mt-3 flex items-center justify-between text-[10px] text-[#a48777]">  
-                      <span>Missy &amp; Mopet • Craft series</span>  
+                      <span>Missy &amp; Moppet • Craft series</span>  
                       <span>{card.footerRight}</span>  
                     </div>  
                   </div>  

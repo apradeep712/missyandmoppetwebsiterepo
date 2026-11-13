@@ -12,14 +12,14 @@ export default function AdminLayout({
       <main className="min-h-screen bg-[#fdf7f2] text-[#4b3b33] pb-20 md:pb-0 font-sans">  
         {/* Mobile Header */}
         <div className="flex items-center justify-between px-6 py-4 bg-white/95 border-b border-[#ead8cd] md:hidden sticky top-0 z-50">
-          <p className="font-serif font-bold text-[#4b3b33]">Missy & Mopet Admin</p>
+          <p className="font-serif font-bold text-[#4b3b33]">Missy & Moppet Admin</p>
         </div>
 
         <div className="mx-auto flex flex-col md:flex-row min-h-screen max-w-6xl px-4 py-6 gap-6">  
           <aside className="hidden md:block w-48 flex-shrink-0 sticky top-6 h-fit rounded-3xl border border-[#ead8cd] bg-white/95 p-4 shadow-sm">  
             <div className="mb-4">  
               <p className="text-xs font-medium uppercase tracking-[0.25em] text-[#b8927c]">Admin</p>  
-              <p className="text-sm font-semibold text-[#4b3b33]">Missy & Mopet</p>  
+              <p className="text-sm font-semibold text-[#4b3b33]">Missy & Moppet</p>  
             </div>  
             <nav className="space-y-2 text-sm">  
               <AdminLinks />

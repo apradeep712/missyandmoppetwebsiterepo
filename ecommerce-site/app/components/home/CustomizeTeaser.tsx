@@ -11,7 +11,7 @@ export default function CustomizeTeaser() {
         {/* eslint-disable-next-line @next/next/no-img-element */}  
         <img  
           src="/hero/hero-4.jpg" // put your real image path here  
-          alt="Customize Missy & Mopet outfit"  
+          alt="Customize Missy & Moppet outfit"  
           className="h-full w-full object-cover"  
         />  
       </div>

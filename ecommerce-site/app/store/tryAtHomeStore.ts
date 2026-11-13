@@ -37,7 +37,7 @@ export const useTryAtHomeStore = create<TryAtHomeState>()(
           return {  
             ok: false,  
             reason:  
-              'Sorry, maximum 3 pieces allowed for Try at home. Please contact Missy & Mopet to talk to our team.',  
+              'Sorry, maximum 3 pieces allowed for Try at home. Please contact Missy & Moppet to talk to our team.',  
           };  
         }
   

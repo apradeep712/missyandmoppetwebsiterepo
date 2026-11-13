@@ -213,7 +213,7 @@ export default function TryAtHomePage() {
           <p className="mb-4 text-xs text-[#7c675b]">  
             Once you share your details, our team will confirm availability and logistics  
             for your Try at home selection. If you&apos;d like to discuss more than 3  
-            pieces, please contact Missy &amp; Mopet directly and we&apos;ll help you  
+            pieces, please contact Missy &amp; Moppet directly and we&apos;ll help you  
             curate a bigger edit.  
           </p>
   

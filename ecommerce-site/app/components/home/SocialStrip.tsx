@@ -28,7 +28,7 @@ export default function SocialStrip() {
               Little moments, big smiles.
             </h3>
             <p className="mt-1 text-sm text-stone-700">
-              Peeks from real days in Missy &amp; Mopet — playdates, naps,
+              Peeks from real days in Missy &amp; Moppet — playdates, naps,
               celebrations and all the in‑betweens.
             </p>
           </div>

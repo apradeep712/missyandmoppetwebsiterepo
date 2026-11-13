@@ -47,7 +47,7 @@ export default function HeroCarousel() {
     // Fallback: simple pastel placeholder  
     return (  
       <div className="flex h-full items-center justify-center px-5 text-center text-sm text-[#8a4b5a]">  
-        Large hero image / video of kids wearing Missy &amp; Mopet  
+        Large hero image / video of kids wearing Missy &amp; Moppet  
       </div>  
     );  
   }
@@ -58,7 +58,7 @@ export default function HeroCarousel() {
     // eslint-disable-next-line @next/next/no-img-element  
     <img  
       src={current.image_url}  
-      alt={current.title || 'Missy & Mopet hero'}  
+      alt={current.title || 'Missy & Moppet hero'}  
       className="h-full w-full object-cover"  
     />  
   );
