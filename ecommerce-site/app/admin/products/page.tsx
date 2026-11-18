@@ -208,30 +208,39 @@ function Modal({
   );
 }
 
-async function uploadViaAdminApi(slug: string, files: File[]) {
-  const fd = new FormData();
-  fd.set('slug', slug);
-  for (const f of files) fd.append('files', f);
-
+/**
+ * 1) Ask our API (admin-only) for one-time signed upload URLs.
+ * 2) Upload each file straight from the browser to Supabase Storage.
+ * Files never go through Vercel, so there is no 4.5 MB size limit.
+ */
+async function uploadViaAdminApi(
+  supabase: ReturnType<typeof createBrowserClient>,
+  slug: string,
+  files: File[]
+) {
   const res = await fetch('/api/admin/upload-product-images', {
     method: 'POST',
-    body: fd,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug, files: files.map((f) => ({ name: f.name, type: f.type })) }),
   });
-
-  const contentType = res.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) {
-    const text = await res.text();
-    throw new Error(`Upload API returned non-JSON (${res.status}). First 200 chars: ${text.slice(0, 200)}`);
-  }
-
-  const json = (await res.json()) as {
-    urls?: string[];
+  const json = (await res.json().catch(() => ({}))) as {
+    bucket?: string;
+    uploads?: { path: string; token: string; publicUrl: string }[];
     error?: string;
-    details?: string;
   };
+  if (res.status === 401) throw new Error('Your admin session has expired. Please reload the page and enter the PIN again.');
+  if (!res.ok || !json.uploads || !json.bucket) throw new Error(json.error || `Could not start upload (${res.status})`);
 
-  if (!res.ok) throw new Error(json.error || `Upload failed (${res.status})`);
-  return json.urls ?? [];
+  const urls: string[] = [];
+  for (let i = 0; i < files.length; i++) {
+    const u = json.uploads[i];
+    const { error } = await supabase.storage
+      .from(json.bucket)
+      .uploadToSignedUrl(u.path, u.token, files[i], { contentType: files[i].type || 'image/jpeg' });
+    if (error) throw new Error(`Upload of "${files[i].name}" failed: ${error.message}`);
+    urls.push(u.publicUrl);
+  }
+  return urls;
 }
 
 export default function AdminProductsPage() {
@@ -466,7 +475,7 @@ export default function AdminProductsPage() {
       let imageUrlToSave: string | null = form.image_url.trim() || null;
 
       if (form.image_file) {
-        const [heroUrl] = await uploadViaAdminApi(slug, [form.image_file]);
+        const [heroUrl] = await uploadViaAdminApi(supabase, slug, [form.image_file]);
         imageUrlToSave = heroUrl ?? null;
       }
 
@@ -499,7 +508,7 @@ export default function AdminProductsPage() {
       if (!productId) throw new Error('Failed to get saved product id.');
 
       if (form.gallery_files.length) {
-        const galleryUrls = await uploadViaAdminApi(slug, form.gallery_files);
+        const galleryUrls = await uploadViaAdminApi(supabase, slug, form.gallery_files);
 
         const { data: existing, error: existingErr } = await supabase
           .from('product_images')

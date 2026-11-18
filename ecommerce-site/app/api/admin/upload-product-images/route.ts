@@ -1,73 +1,51 @@
-// app/api/admin/upload-product-images/route.ts  
-import { NextResponse } from 'next/server';  
-import { createClient } from '@supabase/supabase-js';
-  
+// app/api/admin/upload-product-images/route.ts
+//
+// Hands out one-time signed upload URLs so the browser uploads images straight
+// to Supabase Storage. Files never pass through this function, which avoids
+// Vercel's 4.5 MB request body limit (413 FUNCTION_PAYLOAD_TOO_LARGE).
+import { NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { requireAdmin } from '@/lib/adminAuth';
+
 export const runtime = 'nodejs';
-  
-function jsonError(message: string, status = 500, details?: any) {  
-  return NextResponse.json(  
-    { error: message, details: details ? String(details) : undefined },  
-    { status }  
-  );  
+
+const BUCKET = 'product-images';
+const MAX_FILES = 20;
+
+type FileInfo = { name?: string; type?: string };
+
+export async function POST(req: Request) {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+
+  const body = (await req.json().catch(() => null)) as { slug?: string; files?: FileInfo[] } | null;
+  const slug = String(body?.slug ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '')
+    .slice(0, 120);
+  if (!slug) return NextResponse.json({ error: 'Missing slug' }, { status: 400 });
+
+  const files = Array.isArray(body?.files) ? body!.files : [];
+  if (!files.length) return NextResponse.json({ error: 'No files' }, { status: 400 });
+  if (files.length > MAX_FILES) {
+    return NextResponse.json({ error: `Upload at most ${MAX_FILES} images at a time` }, { status: 400 });
+  }
+
+  const uploads: { path: string; token: string; publicUrl: string }[] = [];
+  for (const f of files) {
+    if (f.type && !f.type.startsWith('image/')) {
+      return NextResponse.json({ error: `"${f.name ?? 'file'}" is not an image` }, { status: 400 });
+    }
+    const ext = (String(f.name ?? '').split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+    const path = `products/${slug}/${crypto.randomUUID()}.${ext}`;
+
+    const { data, error } = await supabaseAdmin.storage.from(BUCKET).createSignedUploadUrl(path);
+    if (error || !data) {
+      return NextResponse.json({ error: 'Could not prepare upload', details: error?.message }, { status: 500 });
+    }
+    const publicUrl = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+    uploads.push({ path: data.path, token: data.token, publicUrl });
+  }
+
+  return NextResponse.json({ bucket: BUCKET, uploads });
 }
-  
-export async function POST(req: Request) {  
-  try {  
-    // OPTIONAL: simple protection so random users can't hit this endpoint  
-    // Set ADMIN_UPLOAD_SECRET in env and send header from your admin UI calls.  
-    const secret = process.env.ADMIN_UPLOAD_SECRET;  
-    if (secret) {  
-      const got = req.headers.get('x-admin-secret');  
-      if (got !== secret) return jsonError('Unauthorized', 401);  
-    }
-  
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;  
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;  
-    if (!url || !serviceKey) return jsonError('Supabase env missing', 500);
-  
-    const supabase = createClient(url, serviceKey, { auth: { persistSession: false } });
-  
-    const form = await req.formData();  
-    const slug = String(form.get('slug') ?? '').trim();  
-    if (!slug) return jsonError('Missing slug', 400);
-  
-    const files = form.getAll('files').filter(Boolean) as File[];  
-    if (!files.length) return jsonError('No files uploaded', 400);
-  
-    // Change bucket name if yours differs  
-    const bucket = 'product-images';
-  
-    const urls: string[] = [];
-  
-    for (const file of files) {  
-      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();  
-      const safeExt = ext.replace(/[^a-z0-9]/g, '') || 'jpg';
-  
-      const arrayBuffer = await file.arrayBuffer();  
-      const bytes = new Uint8Array(arrayBuffer);
-  
-      // Unique path per file  
-      const path = `products/${slug}/${crypto.randomUUID()}.${safeExt}`;
-  
-      const upload = await supabase.storage.from(bucket).upload(path, bytes, {  
-        contentType: file.type || 'image/jpeg',  
-        upsert: false,  
-      });
-  
-      if (upload.error) {  
-        return jsonError('Storage upload failed', 500, upload.error.message);  
-      }
-  
-      const pub = supabase.storage.from(bucket).getPublicUrl(path);  
-      const publicUrl = pub.data.publicUrl;  
-      if (!publicUrl) return jsonError('Could not get public URL', 500);
-  
-      urls.push(publicUrl);  
-    }
-  
-    return NextResponse.json({ urls }, { status: 200 });  
-  } catch (err: any) {  
-    // Always return JSON (never let Next render HTML error pages)  
-    return jsonError('Upload route crashed', 500, err?.message ?? err);  
-  }  
-}  
